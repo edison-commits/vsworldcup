@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build 2>&1 | tail -20)",
+      "Bash(systemctl restart vsworldcup 2>&1 && systemctl status vsworldcup 2>&1 | head -10)",
+      "Bash(npm run build 2>&1 | tail -25)",
+      "Bash(npm run build 2>&1 | tail -15)",
+      "Bash(systemctl restart vsworldcup 2>&1 && systemctl status vsworldcup 2>&1 | head -5)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Zendaya&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Zendaya|Timoth%C3%A9e_Chalamet|Margot_Robbie|Chris_Hemsworth|Rihanna|Ryan_Gosling|Sydney_Sweeney|Pedro_Pascal|Jenna_Ortega|Jacob_Elordi&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Florence_Pugh|Oscar_Isaac|Ana_de_Armas|Dev_Patel|Scarlett_Johansson|Henry_Cavill&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Kendrick_Lamar|Taylor_Swift|The_Beatles|Queen_\\(band\\)|Radiohead|Beyonc%C3%A9|Eminem|Pink_Floyd|Kanye_West|Drake_\\(musician\\)&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Nirvana_\\(band\\)|Bob_Marley|Michael_Jackson|Billie_Eilish|Frank_Ocean|Arctic_Monkeys&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Michael_Jordan|Serena_Williams|Lionel_Messi|Usain_Bolt|Muhammad_Ali|Michael_Phelps|Wayne_Gretzky|Tom_Brady|Simone_Biles|Roger_Federer&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=LeBron_James|Tiger_Woods|Babe_Ruth|Pel%C3%A9|Michael_Schumacher|Cristiano_Ronaldo|Mike_Tyson|Kobe_Bryant&prop=pageimages&format=json&pithumbsize=330\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Pink_Floyd&prop=images&format=json&imlimit=10\" 2>/dev/null | python3 -m json.tool)",
+      "Bash(curl -s -H \"User-Agent: VSWorldCup/1.0 \\(contact@example.com\\)\" \"https://en.wikipedia.org/w/api.php?action=query&titles=Pink_Floyd&prop=images&format=json&imlimit=50\" 2>/dev/null | python3 -c \"\nimport json, sys\ndata = json.load\\(sys.stdin\\)\nfor page in data['query']['pages'].values\\(\\):\n    for img in page.get\\('images', []\\):\n        print\\(img['title']\\)\n\")",
+      "Bash(ls -la /opt/vsworldcup/vs-worldcup/build/og-image.* /opt/vsworldcup/vs-worldcup/public/og-image.* 2>/dev/null)",
+      "Bash(ls -la /opt/vsworldcup/vs-worldcup/build/*.png /opt/vsworldcup/vs-worldcup/build/*.svg /opt/vsworldcup/vs-worldcup/build/*.jpg 2>/dev/null)",
+      "Bash(which rsvg-convert 2>/dev/null; which convert 2>/dev/null; which inkscape 2>/dev/null; which chromium 2>/dev/null; which google-chrome 2>/dev/null; dpkg -l librsvg2-bin 2>/dev/null | head -5; node -e \"console.log\\(process.version\\)\" 2>/dev/null)",
+      "Bash(npm run build 2>&1 | tail -5)",
+      "Bash(node generate-og.js)",
+      "Bash(systemctl restart vsworldcup 2>&1)",
+      "Bash(sleep 2 && curl -s localhost:3000/t/fast-food | grep -o 'og:title[^/]*/' | head -1)",
+      "Bash(sleep 2 && curl -s localhost:3000/t/fast-food | grep -o 'og:image[^/]*/[^\"]*\"')",
+      "Bash(sleep 2 && curl -s localhost:3000/og/fast-food.png -o /dev/null -w '%{http_code}')",
+      "Bash(curl -s localhost:3000/t/fast-food | grep -oE '\\(og:|twitter:\\)\\(title|description|url|image\\)\" content=\"[^\"]*\"')",
+      "Bash(systemctl is-active vsworldcup)",
+      "Bash(grep -c 'tournament\\\\.id' build/static/js/main.*.js)",
+      "Bash(grep -o \"Think you'd pick the same\" /opt/vsworldcup/vs-worldcup/build/static/js/main.*.js | head -1)",
+      "Bash(curl -s localhost:3000/ | grep -o 'static/js/main\\\\.[^\"]*\\\\.js')",
+      "Bash(npm run build 2>&1 | grep -iE 'warning|error|fail' | head -20)",
+      "Bash(npm run build 2>&1)",
+      "Bash(node generate-og.js && systemctl restart vsworldcup)",
+      "Bash(systemctl is-active vsworldcup && curl -s localhost:3000/ -o /dev/null -w '%{http_code}')",
+      "Bash(npm run build 2>&1 | tail -3 && node generate-og.js | tail -1 && systemctl restart vsworldcup && echo \"done\")",
+      "Bash(node generate-og.js | tail -1 && systemctl restart vsworldcup && echo \"done\")",
+      "Bash(systemctl is-active vsworldcup && curl -s -o /dev/null -w '%{http_code}' localhost:3000/)",
+      "Bash(curl -s localhost:3000/t/fast-food | grep -oE 'og:\\(title|image\\)\" content=\"[^\"]*\"')"
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VS WORLDCUP Widget</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+.widget{max-width:500px;margin:0 auto;padding:12px;text-align:center}
+.title{font-size:14px;font-weight:800;margin-bottom:8px;background:linear-gradient(135deg,#ff3366,#ffaa00);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.round{font-size:11px;color:#ff3366;font-family:monospace;margin-bottom:10px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;position:relative}
+.card{position:relative;border-radius:14px;overflow:hidden;cursor:pointer;border:2px solid #222;transition:all 0.3s}
+.card:hover{border-color:#ff3366;transform:scale(1.02)}
+.card.selected{border-color:#ff3366;box-shadow:0 0 30px rgba(255,51,102,0.3);transform:scale(1.03)}
+.card.loser{opacity:0.4;transform:scale(0.95)}
+.card img{width:100%;height:160px;object-fit:cover;display:block}
+.card-name{position:absolute;bottom:0;left:0;right:0;padding:10px;background:linear-gradient(transparent,rgba(0,0,0,0.85));font-size:13px;font-weight:700}
+.vs{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5;width:32px;height:32px;border-radius:50%;background:#ff3366;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;border:2px solid #0a0a0f}
+.powered{margin-top:10px;font-size:10px;color:#666}
+.powered a{color:#ff3366;text-decoration:none}
+.winner-msg{font-size:16px;font-weight:800;color:#ffaa00;margin:16px 0 8px}
+</style>
+</head>
+<body>
+<div class="widget" id="app">
+  <div class="title" id="title">Loading...</div>
+  <div class="round" id="round"></div>
+  <div class="cards" id="cards"></div>
+  <div class="powered">Powered by <a href="https://vsworldcup.com" target="_blank">VS WORLDCUP</a></div>
+</div>
+<script>
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const tid = params.get("t") || "fast-food";
+  const size = parseInt(params.get("size")) || 4;
+
+  fetch("https://api.vsworldcup.com/api/collections/tournaments/records?filter=tournament_id%3D%22"+tid+"%22")
+  .then(r=>r.json()).then(data=>{
+    const t = data.items?.[0];
+    if(!t) return document.getElementById("title").textContent = "Tournament not found";
+    const items = (typeof t.items==="string"?JSON.parse(t.items):t.items)||[];
+    const shuffled = items.sort(()=>Math.random()-0.5).slice(0,size);
+    const matchups = [];
+    for(let i=0;i<shuffled.length;i+=2) matchups.push([shuffled[i],shuffled[i+1]]);
+
+    let ci=0, winners=[], round=size, history=[];
+    document.getElementById("title").textContent = t.title;
+
+    function renderMatch(){
+      if(ci>=matchups.length){
+        if(winners.length===1){
+          document.getElementById("round").textContent = "🏆 CHAMPION";
+          document.getElementById("cards").innerHTML = '<div class="winner-msg">'+winners[0].name+'</div>';
+          return;
+        }
+        const nm=[];for(let i=0;i<winners.length;i+=2)nm.push([winners[i],winners[i+1]]);
+        matchups.length=0;nm.forEach(m=>matchups.push(m));
+        ci=0;winners=[];round=round/2;
+      }
+      const[a,b]=matchups[ci];
+      const rl=round===2?"FINAL":round===4?"SEMI-FINALS":"ROUND OF "+round;
+      document.getElementById("round").textContent = rl+" · Match "+(ci+1)+"/"+matchups.length;
+      const imgA=a.img||"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect fill='%23333' width='200' height='200'/><text x='100' y='110' text-anchor='middle' fill='white' font-size='40'>"+encodeURIComponent(a.name[0])+"</text></svg>";
+      const imgB=b.img||"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect fill='%23333' width='200' height='200'/><text x='100' y='110' text-anchor='middle' fill='white' font-size='40'>"+encodeURIComponent(b.name[0])+"</text></svg>";
+      document.getElementById("cards").innerHTML =
+        '<div class="card" data-pick="0"><img src="'+imgA+'" alt="'+a.name+'"><div class="card-name">'+a.name+'</div></div>'+
+        '<div class="vs">VS</div>'+
+        '<div class="card" data-pick="1"><img src="'+imgB+'" alt="'+b.name+'"><div class="card-name">'+b.name+'</div></div>';
+      document.querySelectorAll(".card").forEach(c=>{
+        c.onclick=function(){
+          const pick=parseInt(this.dataset.pick);
+          const winner=pick===0?a:b;
+          this.classList.add("selected");
+          const loser=this.parentElement.querySelector(".card:not(.selected)");
+          if(loser)loser.classList.add("loser");
+          setTimeout(()=>{winners.push(winner);ci++;renderMatch();},600);
+        };
+      });
+    }
+    renderMatch();
+  }).catch(()=>document.getElementById("title").textContent="Error loading");
+})();
+</script>
+</body>
+</html>

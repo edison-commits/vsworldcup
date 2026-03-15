@@ -1,0 +1,87 @@
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import CreateTournament from './pages/CreateTournament';
+import TournamentBracket from './pages/TournamentBracket';
+import Landing from './pages/Landing';
+import Tournaments from './pages/Tournaments';
+import JoinTournament from './pages/JoinTournament';
+import MyTournaments from './pages/MyTournaments';
+import HowItWorks from './pages/HowItWorks';
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vs-theme');
+      if (saved) return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('vs-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  return (
+    <BrowserRouter>
+      <div className={}>
+        <header className=app-header>
+          <div className=header-content>
+            <Link to=/ className=logo>
+              <span className=logo-icon>🏆</span>
+              <span className=logo-text>VS WORLDCUP</span>
+              <span className=logo-beta>BETA</span>
+            </Link>
+            <nav className=main-nav>
+              <NavLink to=/tournaments>Tournaments</NavLink>
+              <NavLink to=/create>Create</NavLink>
+              <NavLink to=/my-tournaments>My Tournaments</NavLink>
+              <NavLink to=/how-it-works>How It Works</NavLink>
+            </nav>
+            <button className=theme-toggle onClick={toggleTheme} title={}>
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
+          </div>
+        </header>
+        
+        <main className=app-main>
+          <Routes>
+            <Route path=/ element={<Landing user={user} setUser={setUser} />} />
+            <Route path=/tournaments element={<Tournaments user={user} />} />
+            <Route path=/create element={<CreateTournament user={user} setUser={setUser} />} />
+            <Route path=/tournament/:id element={<TournamentBracket user={user} />} />
+            <Route path=/join/:id element={<JoinTournament user={user} setUser={setUser} />} />
+            <Route path=/my-tournaments element={<MyTournaments user={user} />} />
+            <Route path=/how-it-works element={<HowItWorks />} />
+          </Routes>
+        </main>
+
+        <footer className=app-footer>
+          <p>© 2025 VS WorldCup — Let the best win 🏆</p>
+        </footer>
+        
+        <ToastContainer position=bottom-right theme={theme} />
+      </div>
+    </BrowserRouter>
+  );
+}
+
+function NavLink({ to, children }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  return (
+    <Link to={to} className={}>
+      {children}
+    </Link>
+  );
+}
+
+export default App;

@@ -1462,7 +1462,7 @@ export default function App() {
 
       <Header currentView={view} setView={setView} setSelectedTournament={setST} lang={lang} setLang={setLang} themeMode={themeMode} setThemeMode={setThemeMode} soundEnabled={soundEnabled} toggleSound={toggleSound}/>
 
-      {view==="home"&&<HomeView tournaments={tournaments} dailyChallenge={dailyChallenge} recentPlays={recentPlays} resumeGame={resumeGame} onResumeGame={(game)=>{const found=tournaments.find(t=>t.id===game?.tournamentId); if(found){setST(found); setBS(game.bracketSize||found.items.length||16); setView("play");}} onSelect={tr=>{setST(tr);setView("roundSelect");}} setView={setView} onQuickMode={()=>setView("quick")} onDailyChallenge={()=>{setST(dailyChallenge);setBS(16);setView("play");}} lang={lang} sortMode={sortMode} setSortMode={setSortMode} T={T} CATEGORIES={CATEGORIES}/>}
+      {view==="home"&&<HomeView tournaments={tournaments} dailyChallenge={dailyChallenge} recentPlays={recentPlays} resumeGame={resumeGame} onResumeGame={(game)=>{const found=tournaments.find(t=>t.id===game?.tournamentId); if(found){setST(found); setBS(game.bracketSize||found.items.length||16); setView("play");}}} onSelect={tr=>{setST(tr);setView("roundSelect");}} setView={setView} onQuickMode={()=>setView("quick")} onDailyChallenge={()=>{setST(dailyChallenge);setBS(16);setView("play");}} lang={lang} sortMode={sortMode} setSortMode={setSortMode} T={T} CATEGORIES={CATEGORIES}/>}
 
       {view==="create"&&<CreateView onCreated={newT=>{
         setTournaments(p=>[newT,...p]);setST(newT);setView("roundSelect");

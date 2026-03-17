@@ -8,6 +8,15 @@ import {
   saveActiveGame,
   saveLastResult,
 } from "./lib/gameState";
+import {
+  formatNumber,
+  getWinRate,
+  isValidAudioUrl,
+  isValidUrl,
+  rateLimit,
+  sanitizePrompt,
+  shuffleArray,
+} from "./lib/utils";
 import { useTournaments } from "./hooks/useTournaments";
 import { useRecentPlays } from "./hooks/useRecentPlays";
 import HomeView from "./views/HomeView";
@@ -694,48 +703,6 @@ const SAMPLE_TOURNAMENTS = [
     ["Super Mario Odyssey","Pure joy distilled into a hat-throwing platformer","fact","2017"],
   ],"game") },
 ];
-
-// ============================================================
-// UTILITY
-// ============================================================
-function shuffleArray(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
-function formatNumber(n) { if(n>=1e6)return(n/1e6).toFixed(1)+"M"; if(n>=1e3)return(n/1e3).toFixed(1)+"K"; return n.toString(); }
-function getWinRate(item) { const t=item.wins+item.losses; return t>0?((item.wins/t)*100).toFixed(1):"0.0"; }
-// Rate limiter: returns true if action is allowed, false if throttled
-const _rateLimits = {};
-function rateLimit(key, cooldownMs) {
-  const now = Date.now();
-  if (_rateLimits[key] && now - _rateLimits[key] < cooldownMs) return false;
-  _rateLimits[key] = now;
-  return true;
-}
-
-// Security: strict URL validation — only http/https, no javascript/data/blob
-function isValidUrl(u) {
-  if (!u || !u.trim()) return true;
-  try {
-    const parsed = new URL(u.trim());
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-// Security: sanitize AI prompts — strip injection attempts
-function sanitizePrompt(p) {
-  return String(p||"").replace(/[<>{}`\\]/g, "").slice(0, 200).trim();
-}
-
-// Security: whitelist audio preview domains
-function isValidAudioUrl(url) {
-  if(!url) return false;
-  try {
-    const u = new URL(url);
-    const allowed = ["p.scdn.co","audio-ssl.itunes.apple.com","cdns-preview-1.dzcdn.net",
-                     "cdns-preview-2.dzcdn.net","cdns-preview-3.dzcdn.net","cdns-preview-4.dzcdn.net"];
-    return u.protocol === "https:" && allowed.some(d => u.hostname === d || u.hostname.endsWith("." + d));
-  } catch { return false; }
-}
 
 // ============================================================
 // SOUND ENGINE (Web Audio API)

@@ -19,21 +19,25 @@ export function normalizeTournamentRecord(record, makeItemId, fallbackImage) {
     category: record.category || "custom",
     author: record.author || "Anonymous",
     plays: record.plays || 0,
-    items: items.map((item, index) => ({
-      id: makeItemId(),
-      name: item.name || `Entry ${index + 1}`,
-      snippet: item.snippet || "",
-      snippetType: item.snippetType || "none",
-      snippetSource: item.snippetSource || "",
-      audioUrl: item.audioUrl || "",
-      audioStartSec: item.audioStartSec || 0,
-      videoId: item.videoId || "",
-      videoStartSec: item.videoStartSec || 0,
-      videoDuration: item.videoDuration || 8,
-      img: item.img || fallbackImage(item.name || "?"),
-      wins: Math.floor(Math.random() * 15000) + 3000,
-      losses: Math.floor(Math.random() * 12000) + 2000,
-    })),
+    items: items.map((item, index) => {
+      const fallbackImg = fallbackImage(item.name || "?");
+      return {
+        id: makeItemId(),
+        name: item.name || `Entry ${index + 1}`,
+        snippet: item.snippet || "",
+        snippetType: item.snippetType || "none",
+        snippetSource: item.snippetSource || "",
+        audioUrl: item.audioUrl || "",
+        audioStartSec: item.audioStartSec || 0,
+        videoId: item.videoId || "",
+        videoStartSec: item.videoStartSec || 0,
+        videoDuration: item.videoDuration || 8,
+        img: item.img || fallbackImg,
+        fallbackImg,
+        wins: Math.floor(Math.random() * 15000) + 3000,
+        losses: Math.floor(Math.random() * 12000) + 2000,
+      };
+    }),
   };
 }
 

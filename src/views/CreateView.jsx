@@ -72,14 +72,18 @@ export default function CreateView({
       }
     }
 
-    const finalItems = validItems.map((item) => ({
-      ...item,
-      id: getNextId(),
-      name: item.name.trim().slice(0, 60),
-      img: isValidUrl(item.img) && item.img?.trim() ? item.img.trim() : itemGradientImg(item.name),
-      wins: 0,
-      losses: 0,
-    }));
+    const finalItems = validItems.map((item) => {
+      const fallbackImg = itemGradientImg(item.name);
+      return {
+        ...item,
+        id: getNextId(),
+        name: item.name.trim().slice(0, 60),
+        img: isValidUrl(item.img) && item.img?.trim() ? item.img.trim() : fallbackImg,
+        fallbackImg,
+        wins: 0,
+        losses: 0,
+      };
+    });
 
     onCreated({
       id: "custom-" + Date.now(),

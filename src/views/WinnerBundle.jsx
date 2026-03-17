@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SafeImage from "../components/SafeImage";
 
 const REACTION_EMOJIS = [
   { id: "fire", emoji: "🔥", label: "Great pick" },
@@ -156,12 +157,12 @@ function BracketTree({ history, lang, T, itemGradientImg }) {
               {rounds[rk].map((m, i) => (
                 <div key={i} style={{ background: "var(--surfaceLight)", border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px", minWidth: 140, display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <img src={m.winner?.img || itemGradientImg(m.winner?.name)} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                    <SafeImage src={m.winner?.img} fallbackSrc={m.winner?.fallbackImg || itemGradientImg(m.winner?.name)} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
                     <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 700, color: "var(--success)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.winner?.name}</span>
                     <span style={{ fontSize: 10 }}>✓</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.5 }}>
-                    <img src={m.loser?.img || itemGradientImg(m.loser?.name)} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                    <SafeImage src={m.loser?.img} fallbackSrc={m.loser?.fallbackImg || itemGradientImg(m.loser?.name)} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
                     <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, color: "var(--textDim)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.loser?.name}</span>
                   </div>
                 </div>
@@ -187,7 +188,7 @@ export default function WinnerScreen({ tournament, winner, history, demographics
         <h2 style={{ fontFamily: "Outfit,sans-serif", fontSize: 16, fontWeight: 600, color: "var(--textDim)", margin: 0, textTransform: "uppercase", letterSpacing: 3 }}>{tournament.title}</h2>
         <h1 style={{ fontFamily: "Outfit,sans-serif", fontSize: "clamp(28px,6vw,44px)", fontWeight: 900, margin: "12px 0 24px", background: "linear-gradient(135deg,var(--gold),#ffaa00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{winner.name}</h1>
         <div style={{ width: 220, height: 280, borderRadius: 20, overflow: "hidden", margin: "0 auto 20px", border: "3px solid var(--gold)", boxShadow: "0 0 60px rgba(255,215,0,0.3)" }}>
-          <img src={winner.img} alt={winner.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <SafeImage src={winner.img} fallbackSrc={winner.fallbackImg || itemGradientImg(winner.name)} alt={winner.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         {winner.tagline && <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 15, color: "var(--accentAlt)", fontStyle: "italic", marginBottom: 12 }}>{winner.tagline}</p>}
         <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 16, color: "var(--textDim)", marginBottom: 8 }}>{t.yourChampion}</p>

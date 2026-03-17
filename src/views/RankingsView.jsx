@@ -1,3 +1,5 @@
+import SafeImage from "../components/SafeImage";
+
 export default function RankingsView({ tournament, onBack, lang, T, formatNumber, getWinRate }) {
   const t = T[lang];
   const sorted = [...tournament.items].sort((a, b) => (b.wins / (b.wins + b.losses || 1)) - (a.wins / (a.wins + a.losses || 1)));
@@ -15,7 +17,7 @@ export default function RankingsView({ tournament, onBack, lang, T, formatNumber
           return (
             <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: idx < 3 ? "var(--surfaceLight)" : "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
               <span style={{ fontFamily: "Space Mono,monospace", fontSize: idx < 3 ? 20 : 14, fontWeight: 700, width: 36, textAlign: "center", color: idx < 3 ? medalColors[idx] : "var(--textDim)" }}>{idx < 3 ? medals[idx] : `#${idx + 1}`}</span>
-              <img src={item.img} alt={item.name} loading="lazy" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", border: "2px solid var(--border)" }} />
+              <SafeImage src={item.img} fallbackSrc={item.fallbackImg} alt={item.name} loading="lazy" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", border: "2px solid var(--border)" }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 15, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
                 <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: "var(--textDim)" }}>{formatNumber(item.wins)}W / {formatNumber(item.losses)}L</div>

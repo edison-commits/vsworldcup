@@ -1,4 +1,5 @@
 import { memo, useEffect, useState } from "react";
+import SafeImage from "../components/SafeImage";
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -21,7 +22,10 @@ function timeAgo(ts) {
 
 function cardCollageItems(items = []) {
   const fallback = items[0]?.img || "";
-  return [0, 1, 2, 3].map((idx) => items[idx]?.img || fallback);
+  return [0, 1, 2, 3].map((idx) => ({
+    src: items[idx]?.img || fallback,
+    fallback: items[idx]?.fallbackImg || fallback,
+  }));
 }
 
 function DailyChallengeBanner({ tournament, onPlay, lang, T }) {
@@ -144,8 +148,8 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
       style={{ background: "var(--surface)", border: `1px solid ${hover ? "var(--accent)" : "var(--border)"}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "all 0.3s", transform: hover ? "translateY(-4px)" : "none", boxShadow: hover ? "0 12px 40px var(--accentGlow)" : "var(--cardShadow)" }}
     >
       <div style={{ height: 188, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", background: "linear-gradient(135deg, rgba(255,0,102,0.12), rgba(0,229,255,0.12))" }}>
-        {collage.map((src, idx) => (
-          <img key={src + idx} src={src} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
+        {collage.map((image, idx) => (
+          <SafeImage key={(image.src || image.fallback || "img") + idx} src={image.src} fallbackSrc={image.fallback} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
         ))}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.2) 52%, rgba(10,10,15,0.05) 100%)" }} />
         <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Outfit,sans-serif", fontWeight: 600, color: "#fff", maxWidth: "75%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat?.emoji} {cat?.label[lang] || cat?.label.en}</div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import SafeImage from "../components/SafeImage";
 
 export function QuickMode({ tournaments, onFinish, SFX, shuffleArray, lang = "en", T = {} }) {
   const [picks, setPicks] = useState([]);
@@ -72,7 +73,7 @@ export function QuickMode({ tournaments, onFinish, SFX, shuffleArray, lang = "en
               onClick={() => handlePick(item, other)}
               style={{ position: "relative", borderRadius: 20, overflow: "hidden", cursor: animating ? "default" : "pointer", pointerEvents: animating ? "none" : "auto", border: `2px solid ${isSel ? "var(--accent)" : "var(--border)"}`, transition: "all 0.3s", transform: isSel ? "scale(1.02)" : isLos ? "scale(0.95)" : "scale(1)", opacity: isLos ? 0.4 : 1 }}
             >
-              <img src={item.img} alt={item.name} style={{ width: "100%", height: "100%", minHeight: 280, objectFit: "cover", display: "block" }} />
+              <SafeImage src={item.img} fallbackSrc={item.fallbackImg} alt={item.name} style={{ width: "100%", height: "100%", minHeight: 280, objectFit: "cover", display: "block" }} />
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(0,0,0,0.85) 0%,transparent 60%)" }} />
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 18px" }}>
                 <h3 style={{ fontFamily: "Outfit,sans-serif", fontSize: "clamp(14px, 3.5vw, 20px)", fontWeight: 800, color: "#fff", margin: 0 }}>{item.name}</h3>
@@ -98,7 +99,7 @@ export function QuickResults({ picks, onPlayAgain, onGoHome, lang = "en", T = {}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
         {picks.map((p, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 12, background: "var(--surfaceLight)", border: "1px solid var(--border)" }}>
-            <img src={p.winner.img} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover" }} />
+            <SafeImage src={p.winner.img} fallbackSrc={p.winner.fallbackImg} alt="" loading="lazy" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover" }} />
             <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 15, fontWeight: 700, color: "var(--accent)" }}>{p.winner.name}</span>
             <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, color: "var(--textDim)" }}>over</span>
             <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 14, color: "var(--textDim)" }}>{p.loser.name}</span>

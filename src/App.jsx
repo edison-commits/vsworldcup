@@ -26,6 +26,7 @@ import CreateView from "./views/CreateView";
 import { QuickMode, QuickResults } from "./views/QuickMode";
 import RankingsView from "./views/RankingsView";
 import WinnerScreen from "./views/WinnerBundle";
+import SafeImage from "./components/SafeImage";
 
 // ============================================================
 // TRANSLATIONS
@@ -317,22 +318,29 @@ const CATEGORIES = [
 // ============================================================
 let _gid = 1;
 function makeItems(names, sp) {
-  return names.map((name, i) => ({ id: _gid++, name, img: itemGradientImg(name), wins: Math.floor(Math.random()*15000)+3000, losses: Math.floor(Math.random()*12000)+2000 }));
+  return names.map((name, i) => {
+    const fallbackImg = itemGradientImg(name);
+    return { id: _gid++, name, img: fallbackImg, fallbackImg, wins: Math.floor(Math.random()*15000)+3000, losses: Math.floor(Math.random()*12000)+2000 };
+  });
 }
 function makeRichItems(entries, sp) {
-  return entries.map((e, i) => ({
-    id: _gid++, name: e[0], snippet: e[1]||"", snippetType: e[2]||"none",
-    snippetSource: e[3]||"",
-    // Media preview fields (populated when available)
-    audioUrl: e[4]||"",         // Spotify/Apple Music 30s preview MP3
-    audioStartSec: e[5]||0,     // best part to start from
-    videoId: e[6]||"",          // YouTube video ID
-    videoStartSec: e[7]||0,     // YouTube start timestamp
-    videoDuration: e[8]||8,     // how many seconds to show
-    img: itemGradientImg(e[0]),
-    wins: Math.floor(Math.random()*15000)+3000,
-    losses: Math.floor(Math.random()*12000)+2000,
-  }));
+  return entries.map((e, i) => {
+    const fallbackImg = itemGradientImg(e[0]);
+    return {
+      id: _gid++, name: e[0], snippet: e[1]||"", snippetType: e[2]||"none",
+      snippetSource: e[3]||"",
+      // Media preview fields (populated when available)
+      audioUrl: e[4]||"",         // Spotify/Apple Music 30s preview MP3
+      audioStartSec: e[5]||0,     // best part to start from
+      videoId: e[6]||"",          // YouTube video ID
+      videoStartSec: e[7]||0,     // YouTube start timestamp
+      videoDuration: e[8]||8,     // how many seconds to show
+      img: fallbackImg,
+      fallbackImg,
+      wins: Math.floor(Math.random()*15000)+3000,
+      losses: Math.floor(Math.random()*12000)+2000,
+    };
+  });
 }
 
 // Generate a gradient placeholder image as data URI
@@ -884,7 +892,7 @@ function AiGenerator({onGenerated,lang}) {
       const res=await aiGenerateBracket(prompt.trim(),count,lang);
       if(pRef.current)clearInterval(pRef.current); if(!mRef.current)return; setProgress(100);
       if(!res.entries||res.entries.length<4)throw new Error("bad");
-      const items=res.entries.slice(0,count).map((e,i)=>({id:_gid++,name:e.name?.slice(0,60)||`Entry ${i+1}`,tagline:e.tagline||"",snippet:e.tagline||"",snippetType:e.snippetType||"fact",img:itemGradientImg(e.name||'Item'),wins:0,losses:0}));
+      const items=res.entries.slice(0,count).map((e,i)=>{ const fallbackImg=itemGradientImg(e.name||'Item'); return {id:_gid++,name:e.name?.slice(0,60)||`Entry ${i+1}`,tagline:e.tagline||"",snippet:e.tagline||"",snippetType:e.snippetType||"fact",img:fallbackImg,fallbackImg,wins:0,losses:0}; });
       setTimeout(()=>{if(!mRef.current)return;onGenerated({title:res.title?.slice(0,100)||prompt.slice(0,100),category:CATEGORY_IDS.includes(res.category)?res.category:"custom",items});setLoading(false);},400);
     }catch(e){if(pRef.current)clearInterval(pRef.current);if(!mRef.current)return;setError(t.aiError);setLoading(false);setProgress(0);}
   };
@@ -1049,7 +1057,7 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
               transition:"all 0.4s",transform:isSel?"scale(1.02)":isLos?"scale(0.95)":"scale(1)",
               opacity:isLos?0.4:1,boxShadow:isSel?"0 0 40px var(--accentGlow)":"var(--cardShadow)",
             }}>
-              <img src={item.img} alt={item.name} style={{width:"100%",height:"100%",minHeight:"clamp(220px,40vw,380px)",objectFit:"cover",display:"block"}}/>
+              <SafeImage src={item.img} fallbackSrc={item.fallbackImg || itemGradientImg(item.name)} alt={item.name} style={{width:"100%",height:"100%",minHeight:"clamp(220px,40vw,380px)",objectFit:"cover",display:"block"}}/>
               {/* Video data stored in DB for future use */}
               {/* Video countdown overlay */}
 

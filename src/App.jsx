@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { API_ENDPOINTS } from "./lib/api";
+import {
+  clearActiveGame,
+  dismissOnboarding,
+  isOnboardingDismissed,
+  loadActiveGame,
+  saveActiveGame,
+  saveLastResult,
+} from "./lib/gameState";
 import { useTournaments } from "./hooks/useTournaments";
 import { useRecentPlays } from "./hooks/useRecentPlays";
 import HomeView from "./views/HomeView";
@@ -9,9 +17,6 @@ import CreateView from "./views/CreateView";
 import { QuickMode, QuickResults } from "./views/QuickMode";
 import RankingsView from "./views/RankingsView";
 import WinnerScreen from "./views/WinnerBundle";
-
-const ACTIVE_GAME_KEY = "vs_active_game";
-const LAST_RESULT_KEY = "vs_last_result";
 
 // ============================================================
 // TRANSLATIONS
@@ -1257,22 +1262,6 @@ function FeedbackFAB({ onClick }) {
   );
 }
 
-function loadActiveGame() {
-  try { return JSON.parse(localStorage.getItem(ACTIVE_GAME_KEY) || "null"); } catch { return null; }
-}
-function saveActiveGame(payload) {
-  try { localStorage.setItem(ACTIVE_GAME_KEY, JSON.stringify(payload)); } catch {}
-}
-function clearActiveGame() {
-  try { localStorage.removeItem(ACTIVE_GAME_KEY); } catch {}
-}
-function saveLastResult(payload) {
-  try { localStorage.setItem(LAST_RESULT_KEY, JSON.stringify(payload)); } catch {}
-}
-function loadLastResult() {
-  try { return JSON.parse(localStorage.getItem(LAST_RESULT_KEY) || "null"); } catch { return null; }
-}
-
 // ============================================================
 // APP
 // ============================================================
@@ -1385,7 +1374,7 @@ export default function App() {
   },[tournaments]);
 
   const maybeOnboard=()=>{
-    if(playsBeforeOnboard>=2&&!demographics?.ageRange) setShowOnboarding(true);
+    if(playsBeforeOnboard>=2&&!demographics?.ageRange&&!isOnboardingDismissed()) setShowOnboarding(true);
   };
 
   const toggleSound=()=>{const r=SFX.toggle();setSE(r);};
@@ -1438,6 +1427,11 @@ export default function App() {
     setShowOnboarding(false);
   };
 
+  const handleOnboardDismiss=()=>{
+    dismissOnboarding();
+    setShowOnboarding(false);
+  };
+
   return (
     <div style={{minHeight:"100vh",background:th.bg,color:th.text}}>
       <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous"/>
@@ -1458,7 +1452,7 @@ export default function App() {
       `}</style>
 
       {/* Onboarding modal */}
-      {showOnboarding&&<OnboardingModal onComplete={handleOnboardComplete} lang={lang}/>}
+      {showOnboarding&&<OnboardingModal onComplete={handleOnboardComplete} onDismiss={handleOnboardDismiss} lang={lang}/>}
 
       <Header currentView={view} setView={setView} setSelectedTournament={setST} lang={lang} setLang={setLang} themeMode={themeMode} setThemeMode={setThemeMode} soundEnabled={soundEnabled} toggleSound={toggleSound}/>
 
@@ -1480,7 +1474,7 @@ export default function App() {
 
       {view==="play"&&selectedTournament&&bracketSize&&<GamePlay tournament={selectedTournament} bracketSize={bracketSize} onFinish={handleGameFinish} onStart={(payload)=>{saveActiveGame(payload); setResumeGame(payload);}} onBack={()=>{setView("home");setST(null);}} lang={lang}/>}
 
-      {view==="winner"&&selectedTournament&&winner&&<WinnerScreen tournament={selectedTournament} winner={winner} history={matchHistory} demographics={demographics} onPlayAgain={()=>{clearActiveGame(); setResumeGame(null); setView("home");setST(null);setWinner(null);maybeOnboard();}} onRematch={()=>{setView("play");}} onViewRanking={()=>setView("rankings")} onBack={()=>{clearActiveGame(); setResumeGame(null); setView("home");setST(null);setWinner(null);}} lang={lang} T={T} SFX={SFX} itemGradientImg={itemGradientImg} />}
+      {view==="winner"&&selectedTournament&&winner&&<WinnerScreen tournament={selectedTournament} winner={winner} history={matchHistory} demographics={demographics} onPlayAgain={()=>{clearActiveGame(); setResumeGame(null); setView("home");setST(null);setWinner(null);maybeOnboard();}} onRematch={()=>{setView("play");}} onViewRanking={()=>setView("rankings")} onBack={()=>{clearActiveGame(); setResumeGame(null); setView("home");setST(null);setWinner(null);maybeOnboard();}} lang={lang} T={T} SFX={SFX} itemGradientImg={itemGradientImg} />}
 
       {view==="rankings"&&selectedTournament&&<RankingsView tournament={selectedTournament} onBack={()=>{setView("home");setST(null);}} lang={lang} T={T} formatNumber={formatNumber} getWinRate={getWinRate} />}
 

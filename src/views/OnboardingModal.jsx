@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function OnboardingModal({ onComplete }) {
+export default function OnboardingModal({ onComplete, onDismiss }) {
   const [age, setAge] = useState("");
   const [gender] = useState("");
   const [step, setStep] = useState(0);
@@ -19,7 +19,8 @@ export default function OnboardingModal({ onComplete }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(10px)" }}>
-      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 24, padding: "36px 32px", maxWidth: 400, width: "90%", textAlign: "center" }}>
+      <div className="vs-modal-shell" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 24, padding: "36px 32px", maxWidth: 400, width: "90%", textAlign: "center", position: "relative" }}>
+        <button onClick={onDismiss} aria-label="Close onboarding" style={{ position: "absolute", top: 14, right: 14, width: 34, height: 34, borderRadius: 17, border: "1px solid var(--border)", background: "var(--surfaceLight)", color: "var(--textDim)", fontSize: 18, cursor: "pointer" }}>×</button>
         {step === 0 && (
           <>
             <div style={{ fontSize: 36, marginBottom: 12 }}>📊</div>
@@ -49,7 +50,10 @@ export default function OnboardingModal({ onComplete }) {
                 </button>
               ))}
             </div>
-            <button onClick={() => { setAge("unknown"); setStep(1); }} style={{ background: "none", border: "none", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 13, cursor: "pointer" }}>Skip →</button>
+            <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
+              <button onClick={() => { setAge("unknown"); setStep(1); }} style={{ background: "none", border: "none", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 13, cursor: "pointer" }}>Skip →</button>
+              <button onClick={onDismiss} style={{ background: "none", border: "none", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 13, cursor: "pointer" }}>Not now</button>
+            </div>
           </>
         )}
         {step === 1 && (
@@ -78,6 +82,7 @@ export default function OnboardingModal({ onComplete }) {
                 </button>
               ))}
             </div>
+            <button onClick={onDismiss} style={{ background: "none", border: "none", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 13, cursor: "pointer" }}>Not now</button>
           </>
         )}
       </div>

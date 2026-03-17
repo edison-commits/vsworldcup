@@ -19,6 +19,11 @@ function timeAgo(ts) {
   return Math.floor(d / 7) + "w ago";
 }
 
+function cardCollageItems(items = []) {
+  const fallback = items[0]?.img || "";
+  return [0, 1, 2, 3].map((idx) => items[idx]?.img || fallback);
+}
+
 function DailyChallengeBanner({ tournament, onPlay, lang, T }) {
   const [hours, setHours] = useState(0);
   const [mins, setMins] = useState(0);
@@ -53,10 +58,11 @@ function DailyChallengeBanner({ tournament, onPlay, lang, T }) {
         alignItems: "center",
         gap: 16,
         transition: "all 0.2s",
+        flexWrap: "wrap",
       }}
     >
       <div style={{ fontSize: 32 }}>🏆</div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "var(--gold)", marginBottom: 4 }}>
           {t.dailyChallenge}
         </div>
@@ -65,7 +71,7 @@ function DailyChallengeBanner({ tournament, onPlay, lang, T }) {
           {tournament.items.length} {t.entries} · {t.sameBracket}
         </div>
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
+      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "auto" }}>
         <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: "var(--textDim)" }}>{t.resetsIn}</div>
         <div style={{ fontFamily: "Space Mono,monospace", fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>{hours}h {mins}m</div>
       </div>
@@ -77,14 +83,14 @@ function ResumeBanner({ resumeGame, onResumeGame, lang, T }) {
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
   if (!resumeGame) return null;
   return (
-    <div onClick={() => onResumeGame && onResumeGame(resumeGame)} style={{ border: "1px solid rgba(0,229,255,0.22)", background: "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(255,51,102,0.06))", borderRadius: 20, padding: "18px 22px", marginBottom: 20, cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
+    <div onClick={() => onResumeGame && onResumeGame(resumeGame)} style={{ border: "1px solid rgba(0,229,255,0.22)", background: "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(255,51,102,0.06))", borderRadius: 20, padding: "18px 22px", marginBottom: 20, cursor: "pointer", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
       <div style={{ fontSize: 28 }}>🎯</div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "var(--accentAlt)", marginBottom: 4 }}>{t.continueBracket || "Continue your bracket"}</div>
         <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, fontWeight: 800, color: "var(--text)" }}>{resumeGame.title}</div>
         <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", marginTop: 2 }}>{resumeGame.bracketSize} {t.entries} · {t.pickUpWhere || "pick up where you left off"}</div>
       </div>
-      <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", background: "var(--accent)", borderRadius: 999, padding: "10px 14px" }}>{t.resume || "Resume"}</div>
+      <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", background: "var(--accent)", borderRadius: 999, padding: "10px 14px", marginLeft: "auto" }}>{t.resume || "Resume"}</div>
     </div>
   );
 }
@@ -129,6 +135,7 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
   const [hover, setHover] = useState(false);
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
   const cat = CATEGORIES.find((c) => c.id === tournament.category);
+  const collage = cardCollageItems(tournament.items);
   return (
     <div
       onClick={onClick}
@@ -136,18 +143,21 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
       onMouseLeave={() => setHover(false)}
       style={{ background: "var(--surface)", border: `1px solid ${hover ? "var(--accent)" : "var(--border)"}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "all 0.3s", transform: hover ? "translateY(-4px)" : "none", boxShadow: hover ? "0 12px 40px var(--accentGlow)" : "var(--cardShadow)" }}
     >
-      <div style={{ height: 170, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-        <img src={tournament.items[0]?.img} alt="" loading="lazy" style={{ width: "100%", height: 170, objectFit: "cover" }} />
-        <img src={tournament.items[1]?.img} alt="" loading="lazy" style={{ width: "100%", height: 170, objectFit: "cover" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,15,0.95) 0%,transparent 60%)" }} />
-        <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Outfit,sans-serif", fontWeight: 600, color: "#fff" }}>{cat?.emoji} {cat?.label[lang] || cat?.label.en}</div>
+      <div style={{ height: 188, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", background: "linear-gradient(135deg, rgba(255,0,102,0.12), rgba(0,229,255,0.12))" }}>
+        {collage.map((src, idx) => (
+          <img key={src + idx} src={src} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
+        ))}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.2) 52%, rgba(10,10,15,0.05) 100%)" }} />
+        <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Outfit,sans-serif", fontWeight: 600, color: "#fff", maxWidth: "75%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat?.emoji} {cat?.label[lang] || cat?.label.en}</div>
         <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Space Mono,monospace", color: "#00e5ff" }}>{tournament.items.length} {t.entries}</div>
+        <div style={{ position: "absolute", left: 14, right: 14, bottom: 14 }}>
+          <h3 style={{ fontFamily: "Outfit,sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.15, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 4px 18px rgba(0,0,0,0.55)" }}>{tournament.title}</h3>
+        </div>
       </div>
       <div style={{ padding: "14px 18px" }}>
-        <h3 style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, fontWeight: 700, color: "var(--text)", margin: 0, marginBottom: 6 }}>{tournament.title}</h3>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)" }}>{t.by} {tournament.author}</span>
-          <span style={{ fontFamily: "Space Mono,monospace", fontSize: 13, color: "var(--accent)" }}>▶ {formatNumber(tournament.plays)} {t.plays}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.by} {tournament.author}</span>
+          <span style={{ fontFamily: "Space Mono,monospace", fontSize: 13, color: "var(--accent)", flexShrink: 0 }}>▶ {formatNumber(tournament.plays)} {t.plays}</span>
         </div>
       </div>
     </div>
@@ -188,13 +198,13 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
         {[["popular", "🔥 Popular"], ["new", "✨ New"], ["az", "A→Z"]].map(([k, label]) => (
           <button key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: `1px solid ${sortMode === k ? "var(--accent)" : "var(--border)"}`, borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
         ))}
       </div>
 
-      <div className="vs-tournament-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 20 }}>
+      <div className="vs-tournament-grid">
         {filtered.map((tr) => <TournamentCard key={tr.id} tournament={tr} onClick={() => onSelect(tr)} lang={lang} T={T} CATEGORIES={CATEGORIES} />)}
       </div>
       {filtered.length === 0 && <div style={{ textAlign: "center", padding: 60, color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 16 }}>{t.noCat}</div>}

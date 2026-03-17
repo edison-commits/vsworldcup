@@ -108,18 +108,18 @@ export default function CreateView({
         {CATEGORIES.map((cat) => <button key={cat.id} onClick={() => setCategory(cat.id)} style={{ background: category === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: category === cat.id ? "#fff" : "var(--textDim)", border: `1px solid ${category === cat.id ? "var(--accent)" : "var(--border)"}`, borderRadius: 20, padding: "7px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>)}
       </div>
       <label style={{ fontFamily: "Outfit,sans-serif", fontSize: 14, fontWeight: 600, color: "var(--textDim)", display: "block", marginBottom: 10 }}>{t.entriesLabel} ({items.length})</label>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "8px 14px", borderRadius: 10, background: isPower ? "rgba(0,230,118,0.08)" : "rgba(255,51,102,0.06)", border: `1px solid ${isPower ? "rgba(0,230,118,0.2)" : "rgba(255,51,102,0.15)"}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "8px 14px", borderRadius: 10, background: isPower ? "rgba(0,230,118,0.08)" : "rgba(255,51,102,0.06)", border: `1px solid ${isPower ? "rgba(0,230,118,0.2)" : "rgba(255,51,102,0.15)"}`, flexWrap: "wrap" }}>
         <span style={{ fontFamily: "Space Mono,monospace", fontSize: 13, color: isPower ? "var(--success)" : "var(--accent)" }}>{validCount} named</span>
         {!isPower && validCount >= 2 && <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, color: "var(--textDim)" }}>→ need {targets.filter((n) => n >= 4).join(", ")}</span>}
         {isPower && <span style={{ fontSize: 14 }}>✓</span>}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
         {items.map((item, idx) => (
-          <div key={item.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontFamily: "Space Mono,monospace", fontSize: 12, color: "var(--textDim)", width: 26, textAlign: "right", flexShrink: 0 }}>{idx + 1}.</span>
-            <input value={item.name} onChange={(e) => updateItem(item.id, "name", e.target.value)} placeholder={t.entryName} maxLength={60} style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "Outfit,sans-serif", fontSize: 14, outline: "none", minWidth: 0 }} />
-            <input value={item.img} onChange={(e) => updateItem(item.id, "img", e.target.value)} placeholder={t.imageUrl} maxLength={500} style={{ flex: 1, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "Outfit,sans-serif", fontSize: 14, outline: "none", minWidth: 0 }} />
-            <button onClick={() => removeItem(item.id)} style={{ width: 34, height: 34, borderRadius: 8, background: items.length <= 4 ? "var(--surface)" : "rgba(255,51,102,0.15)", border: `1px solid ${items.length <= 4 ? "var(--border)" : "rgba(255,51,102,0.3)"}`, color: items.length <= 4 ? "var(--border)" : "var(--accent)", fontSize: 18, cursor: items.length <= 4 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>×</button>
+          <div key={item.id} className="vs-entry-row">
+            <span className="vs-entry-row__index" style={{ fontFamily: "Space Mono,monospace", fontSize: 12, color: "var(--textDim)", width: 26, textAlign: "right", flexShrink: 0 }}>{idx + 1}.</span>
+            <input value={item.name} onChange={(e) => updateItem(item.id, "name", e.target.value)} placeholder={t.entryName} maxLength={60} style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "Outfit,sans-serif", fontSize: 14, outline: "none", minWidth: 0 }} />
+            <input value={item.img} onChange={(e) => updateItem(item.id, "img", e.target.value)} placeholder={t.imageUrl} maxLength={500} style={{ width: "100%", padding: "11px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "Outfit,sans-serif", fontSize: 14, outline: "none", minWidth: 0 }} />
+            <button className="vs-entry-row__remove" onClick={() => removeItem(item.id)} style={{ width: 34, height: 34, borderRadius: 8, background: items.length <= 4 ? "var(--surface)" : "rgba(255,51,102,0.15)", border: `1px solid ${items.length <= 4 ? "var(--border)" : "rgba(255,51,102,0.3)"}`, color: items.length <= 4 ? "var(--border)" : "var(--accent)", fontSize: 18, cursor: items.length <= 4 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>×</button>
           </div>
         ))}
       </div>

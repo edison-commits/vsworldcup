@@ -5,9 +5,72 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #0b0b12;
+  color: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+.vs-tournament-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.vs-entry-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+}
+
+.vs-modal-shell {
+  width: min(92vw, 400px);
+  max-height: min(88vh, 720px);
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .vs-tournament-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .vs-tournament-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .vs-entry-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .vs-entry-row__index {
+    width: auto;
+    text-align: left;
+  }
+
+  .vs-entry-row__remove {
+    width: 100%;
+  }
 }

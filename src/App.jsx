@@ -1462,7 +1462,7 @@ export default function App() {
         }).then(r=>{if(r.ok)console.log("Tournament saved to DB");}).catch(()=>{});
       }} lang={lang} T={T} CATEGORIES={CATEGORIES} AiGenerator={AiGenerator} isValidUrl={isValidUrl} itemGradientImg={itemGradientImg} getNextId={()=>_gid++} />}
 
-      {view==="roundSelect"&&selectedTournament&&<RoundSelector itemCount={selectedTournament.items.length} onSelect={s=>{setBS(s);setView("play");}} lang={lang} T={T}/>}
+      {view==="roundSelect"&&selectedTournament&&selectedTournament.items&&<RoundSelector itemCount={selectedTournament.items.length} onSelect={s=>{try{setBS(s);setView("play");}catch(e){console.error("Bracket select error:",e);}}} lang={lang} T={T}/>}
 
       {view==="play"&&selectedTournament&&bracketSize&&<GamePlay tournament={selectedTournament} bracketSize={bracketSize} onFinish={handleGameFinish} onStart={(payload)=>{saveActiveGame(payload); setResumeGame(payload);}} onBack={()=>{setView("home");setST(null);}} lang={lang}/>}
 

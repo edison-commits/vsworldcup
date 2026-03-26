@@ -10,7 +10,7 @@ export default function RoundSelector({ itemCount, onSelect, lang, T }) {
         {possible.map((r) => (
           <button
             key={r}
-            onClick={() => onSelect(r)}
+            onClick={() => { try { onSelect(r); } catch(e) { console.error("RoundSelector click error:", e); } }}
             style={{ width: 100, height: 100, borderRadius: 16, background: "var(--surfaceLight)", border: "2px solid var(--border)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", gap: 4, transition: "all 0.2s" }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = "var(--accent)";

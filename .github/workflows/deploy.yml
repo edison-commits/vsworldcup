@@ -29,7 +29,8 @@ jobs:
           npm ci
           npm run build
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
           name: vsworldcup-dist
           path: build/
@@ -38,7 +39,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
         with:
           name: vsworldcup-dist
           path: /tmp/dist
@@ -51,7 +53,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           rm: true
           overwrite: true
-          source: "/tmp/dist"
+          strip_components: 0
+          source: "/tmp/dist/build"
           target: "/opt/vsworldcup/vs-worldcup/build/"
 
       - name: Restart service
@@ -62,5 +65,5 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             systemctl restart vsworldcup
-            sleep 2
-            systemctl status vsworldcup --no-pager | head -5
+            sleep 3
+            systemctl is-active vsworldcup

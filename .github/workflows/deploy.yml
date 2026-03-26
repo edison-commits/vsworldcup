@@ -29,34 +29,31 @@ jobs:
           npm ci
           npm run build
 
-      # Upload just the build output, named so it replaces previous artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: vsworldcup-dist
           path: build/
-          retention-days: 1
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      # Download to /tmp/dist — artifact contains build/ folder at root
       - uses: actions/download-artifact@v4
         with:
           name: vsworldcup-dist
           path: /tmp/dist
 
-      # Copy build contents to the correct location
       - name: Deploy to VPS
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
+          strip_components: 1
           rm: true
-          recursive: true
-          source: "/tmp/dist/build/*"
-          target: "/opt/vsworldcup/vs-worldcup/build/"
+          overwrite: true
+          source: "/tmp/dist/build"
+          target: "/opt/vsworldcup/vs-worldcup/"
 
       - name: Restart service
         uses: appleboy/ssh-action@master
@@ -64,4 +61,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
-          script: systemctl restart vsworldcup
+          script: |
+            systemctl restart vsworldcup
+            sleep 2
+            systemctl status vsworldcup --no-pager | head -5

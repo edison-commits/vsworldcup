@@ -264,7 +264,7 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
   );
 });
 
-export default function HomeView({ tournaments, dailyChallenge, recentPlays, resumeGame, onResumeGame, onSelect, setView, onQuickMode, onDailyChallenge, lang, sortMode, setSortMode, T, CATEGORIES, isLoading }) {
+export default function HomeView({ tournaments, dailyChallenge, recentPlays, resumeGame, onResumeGame, onSelect, setView, onQuickMode, onDailyChallenge, lang, sortMode, setSortMode, T, CATEGORIES, isLoading, onFeedback }) {
   const [fc, setFc] = useState("all");
   const [search, setSearch] = useState("");
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
@@ -374,6 +374,38 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
           )}
         </div>
       )}
+
+      {/* Footer: feedback + report */}
+      <div style={{
+        marginTop: 48,
+        padding: "24px 20px 16px",
+        borderTop: "1px solid var(--border)",
+        textAlign: "center",
+        fontFamily: "'Outfit',sans-serif",
+      }}>
+        <div style={{ fontSize: 13, color: "var(--textDim)", marginBottom: 10 }}>
+          Something wrong or want to suggest something?{" "}
+          <button
+            onClick={onFeedback}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--accent)",
+              cursor: "pointer",
+              fontFamily: "'Outfit',sans-serif",
+              fontSize: 13,
+              fontWeight: 600,
+              padding: "2px 0",
+              textDecoration: "underline",
+            }}
+          >
+            Let us know
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--textDim)", opacity: 0.6 }}>
+          VS WORLDCUP · Built with 💪
+        </div>
+      </div>
     </div>
   );
 }

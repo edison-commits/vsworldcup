@@ -981,15 +981,20 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
   useEffect(()=>{mountedRef.current=true;return()=>{mountedRef.current=false;if(timerRef.current)clearTimeout(timerRef.current);AudioEngine.stopAll();};},[]);
 
   // Keyboard shortcuts: A/Left = pick left, D/Right = pick right
+  // Note: left/right read from matchups[ci] directly (not via closure deps) to avoid
+  // TDZ crash — left, right, and handlePick are declared after this useEffect call.
   useEffect(()=>{
     if(!matchups.length||!matchups[ci]||animating)return;
     const handleKey=(e)=>{
-      if(e.key==="ArrowLeft"||e.key==="a"||e.key==="A"){if(!animRef.current)handlePick(left,right);}
-      if(e.key==="ArrowRight"||e.key==="d"||e.key==="D"){if(!animRef.current)handlePick(right,left);}
+      const[left,right]=matchups[ci];
+      if(!left||!right)return;
+      if((e.key==="ArrowLeft"||e.key==="a"||e.key==="A")&&!animRef.current)handlePick(left,right);
+      if((e.key==="ArrowRight"||e.key==="d"||e.key==="D")&&!animRef.current)handlePick(right,left);
     };
     window.addEventListener("keydown",handleKey);
     return()=>window.removeEventListener("keydown",handleKey);
-  },[matchups,ci,left,right,animating,handlePick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[matchups,ci,animating]); // handlePick intentionally omitted — closure always calls current version
   useEffect(()=>{
     const sh=shuffleArray(tournament.items).slice(0,bracketSize);
     const pairs=[]; for(let i=0;i<sh.length;i+=2)pairs.push([sh[i],sh[i+1]]);
@@ -1275,7 +1280,7 @@ export default function App() {
   const viewRef=useRef("home");
   useEffect(()=>{viewRef.current=view;},[view]);
 
-  const { tournaments, setTournaments, dailyChallenge, isLoading } = useTournaments(
+  const { tournaments, setTournaments, dailyChallenge } = useTournaments(
     SAMPLE_TOURNAMENTS,
     () => _gid++,
     itemGradientImg
@@ -1448,7 +1453,7 @@ export default function App() {
 
       <Header currentView={view} setView={setView} setSelectedTournament={setST} lang={lang} setLang={setLang} themeMode={themeMode} setThemeMode={setThemeMode} soundEnabled={soundEnabled} toggleSound={toggleSound}/>
 
-      {view==="home"&&<HomeView tournaments={tournaments} dailyChallenge={dailyChallenge} recentPlays={recentPlays} resumeGame={resumeGame} onResumeGame={(game)=>{const found=tournaments.find(t=>t.id===game?.tournamentId); if(found){setST(found); setBS(game.bracketSize||found.items.length||16); setView("play");}}} onSelect={tr=>{setST(tr);setView("roundSelect");}} setView={setView} onQuickMode={()=>setView("quick")} onDailyChallenge={()=>{setST(dailyChallenge);setBS(16);setView("play");}} lang={lang} sortMode={sortMode} setSortMode={setSortMode} T={T} CATEGORIES={CATEGORIES}/>}
+      {view==="home"&&<HomeView tournaments={tournaments} dailyChallenge={dailyChallenge} recentPlays={recentPlays} resumeGame={resumeGame} onResumeGame={(game)=>{const found=tournaments.find(t=>t.id===game?.tournamentId); if(found){setST(found); setBS(game.bracketSize||found.items.length||16); setView("play");}}} onSelect={tr=>{setST(tr);setView("roundSelect");}} setView={setView} onQuickMode={()=>setView("quick")} onDailyChallenge={()=>{setST(dailyChallenge);setBS(16);setView("play");}} lang={lang} sortMode={sortMode} setSortMode={setSortMode} T={T} CATEGORIES={CATEGORIES} onFeedback={()=>setShowFeedback(true)}/>}
 
       {view==="create"&&<CreateView onCreated={newT=>{
         setTournaments(p=>[newT,...p]);setST(newT);setView("roundSelect");

@@ -1,0 +1,45 @@
+name: Deploy to Hetzner VPS
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            src
+            public
+            package.json
+            package-lock.json
+            server.js
+            vite.config.js
+            index.html
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install & Build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            rsync -ra --delete /home runner/_work/vsworldcup/vsworldcup/src/ /opt/vsworldcup/vs-worldcup/src/
+            rsync -ra --delete /home/runner/_work/vsworldcup/vsworldcup/public/ /opt/vsworldcup/vs-worldcup/public/
+            cp /home/runner/_work/vsworldcup/vsworldcup/package*.json /opt/vsworldcup/vs-worldcup/
+            cd /opt/vsworldcup/vs-worldcup && npm ci --production && npm run build
+            systemctl restart vsworldcup

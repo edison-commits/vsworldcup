@@ -979,6 +979,17 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
   // Spectator stats (simulated)
   const[spectatorPct,setSpectatorPct]=useState(null);
   useEffect(()=>{mountedRef.current=true;return()=>{mountedRef.current=false;if(timerRef.current)clearTimeout(timerRef.current);AudioEngine.stopAll();};},[]);
+
+  // Keyboard shortcuts: A/Left = pick left, D/Right = pick right
+  useEffect(()=>{
+    if(!matchups.length||!matchups[ci]||animating)return;
+    const handleKey=(e)=>{
+      if(e.key==="ArrowLeft"||e.key==="a"||e.key==="A"){if(!animRef.current)handlePick(left,right);}
+      if(e.key==="ArrowRight"||e.key==="d"||e.key==="D"){if(!animRef.current)handlePick(right,left);}
+    };
+    window.addEventListener("keydown",handleKey);
+    return()=>window.removeEventListener("keydown",handleKey);
+  },[matchups,ci,left,right,animating,handlePick]);
   useEffect(()=>{
     const sh=shuffleArray(tournament.items).slice(0,bracketSize);
     const pairs=[]; for(let i=0;i<sh.length;i+=2)pairs.push([sh[i],sh[i+1]]);
@@ -1054,7 +1065,7 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
             <div key={`s${si}-r${crn}-m${ci}`} onClick={()=>handlePick(item,other)} style={{
               position:"relative",borderRadius:20,overflow:"hidden",cursor:animating?"default":"pointer",
               pointerEvents:animating?"none":"auto",border:`2px solid ${isSel?"var(--accent)":"var(--border)"}`,
-              transition:"all 0.4s",transform:isSel?"scale(1.02)":isLos?"scale(0.95)":"scale(1)",
+              transition:"all 0.4s",transform:isSel?"scale(1.05)":isLos?"scale(0.95)":"scale(1)",
               opacity:isLos?0.4:1,boxShadow:isSel?"0 0 40px var(--accentGlow)":"var(--cardShadow)",
             }}>
               <SafeImage src={item.img} fallbackSrc={item.fallbackImg || itemGradientImg(item.name)} alt={item.name} style={{width:"100%",height:"100%",minHeight:"clamp(220px,40vw,380px)",objectFit:"cover",display:"block"}}/>
@@ -1089,7 +1100,7 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
           );
         })}
         <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:10,pointerEvents:"none"}}>
-          <span style={{display:"inline-block",width:52,height:52,lineHeight:"52px",borderRadius:"50%",background:"var(--bg)",border:"3px solid var(--accent)",fontFamily:"'Space Mono',monospace",fontSize:16,fontWeight:700,color:"var(--accent)",boxShadow:"0 0 30px var(--accentGlow)",textAlign:"center"}}>VS</span>
+          <span style={{display:"inline-block",width:56,height:56,lineHeight:"56px",borderRadius:"50%",background:"var(--bg)",border:"3px solid var(--accent)",fontFamily:"'Space Mono',monospace",fontSize:18,fontWeight:700,color:"var(--accent)",boxShadow:"0 0 30px var(--accentGlow),0 0 60px rgba(255,51,102,0.2)",textAlign:"center",animation:"vsPulse 1.5s ease-in-out infinite"}}>VS</span>
         </div>
       </div>
       {/* Spectator stat flash */}
@@ -1098,6 +1109,10 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
           {spectatorPct}% {t.ofPlayersAgreed}
         </div>
       )}
+      {/* Keyboard shortcut hint */}
+      <div style={{textAlign:"center",marginTop:14,fontFamily:"'Space Mono',monospace",fontSize:12,color:"var(--textDim)",opacity:0.5,letterSpacing:1}}>
+        ← A&nbsp;&nbsp;|&nbsp;&nbsp;D →
+      </div>
     </div>
   );
 }
@@ -1260,7 +1275,7 @@ export default function App() {
   const viewRef=useRef("home");
   useEffect(()=>{viewRef.current=view;},[view]);
 
-  const { tournaments, setTournaments, dailyChallenge } = useTournaments(
+  const { tournaments, setTournaments, dailyChallenge, isLoading } = useTournaments(
     SAMPLE_TOURNAMENTS,
     () => _gid++,
     itemGradientImg
@@ -1421,6 +1436,8 @@ export default function App() {
         @keyframes fadeIn{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
         @keyframes audioBar{0%{height:4px}100%{height:16px}}
         @keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        @keyframes vsPulse{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 20px var(--accentGlow),0 0 40px rgba(255,51,102,0.15)}50%{transform:translate(-50%,-50%) scale(1.08);box-shadow:0 0 35px var(--accentGlow),0 0 60px rgba(255,51,102,0.25)}}
         img{user-select:none;-webkit-user-drag:none;}
         input::placeholder{color:var(--text-dim,#88889955);}
         ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}

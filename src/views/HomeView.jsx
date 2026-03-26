@@ -28,6 +28,53 @@ function cardCollageItems(items = []) {
   }));
 }
 
+// ---------- Skeleton Card ----------
+function SkeletonCard() {
+  return (
+    <div style={{
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 16,
+      overflow: "hidden",
+    }}>
+      <div style={{
+        height: 188,
+        background: "var(--surfaceLight)",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%)",
+          animation: "shimmer 1.5s ease-in-out infinite",
+          backgroundSize: "200% 100%",
+        }} />
+      </div>
+      <div style={{ padding: "14px 18px" }}>
+        <div style={{
+          height: 14,
+          borderRadius: 6,
+          background: "var(--surfaceLight)",
+          marginBottom: 10,
+          width: "70%",
+          animation: "shimmer 1.5s ease-in-out infinite",
+          backgroundSize: "200% 100%",
+        }} />
+        <div style={{
+          height: 14,
+          borderRadius: 6,
+          background: "var(--surfaceLight)",
+          width: "45%",
+          animation: "shimmer 1.5s ease-in-out infinite",
+          animationDelay: "0.2s",
+          backgroundSize: "200% 100%",
+        }} />
+      </div>
+    </div>
+  );
+}
+
 function DailyChallengeBanner({ tournament, onPlay, lang, T }) {
   const [hours, setHours] = useState(0);
   const [mins, setMins] = useState(0);
@@ -87,7 +134,9 @@ function ResumeBanner({ resumeGame, onResumeGame, lang, T }) {
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
   if (!resumeGame) return null;
   return (
-    <div onClick={() => onResumeGame && onResumeGame(resumeGame)} style={{ border: "1px solid rgba(0,229,255,0.22)", background: "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(255,51,102,0.06))", borderRadius: 20, padding: "18px 22px", marginBottom: 20, cursor: "pointer", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+    <div onClick={() => onResumeGame && onResumeGame(resumeGame)} style={{ border: "1px solid rgba(0,229,255,0.22)", background: "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(255,51,102,0.06))",
+      borderRadius: 20, padding: "18px 22px", marginBottom: 20, cursor: "pointer", display: "flex",
+      alignItems: "center", gap: 14, flexWrap: "wrap" }}>
       <div style={{ fontSize: 28 }}>🎯</div>
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "var(--accentAlt)", marginBottom: 4 }}>{t.continueBracket || "Continue your bracket"}</div>
@@ -135,26 +184,73 @@ function RecentlyPlayed({ recentPlays, tournaments, onSelect, lang, T }) {
   );
 }
 
+// ---------- Tournament Card with Badges ----------
 const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang, T, CATEGORIES }) {
   const [hover, setHover] = useState(false);
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
   const cat = CATEGORIES.find((c) => c.id === tournament.category);
   const collage = cardCollageItems(tournament.items);
+
+  // Badge logic
+  const isTrending = (tournament.plays || 0) >= 30000;
+  const isNew = (() => {
+    const id = tournament.id || "";
+    const ts = parseInt(id.replace(/\D/g, "").slice(0, 13), 10);
+    if (!isNaN(ts) && ts > 0) {
+      const daysDiff = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+      return daysDiff <= 7;
+    }
+    return false;
+  })();
+
   return (
     <div
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ background: "var(--surface)", border: `1px solid ${hover ? "var(--accent)" : "var(--border)"}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "all 0.3s", transform: hover ? "translateY(-4px)" : "none", boxShadow: hover ? "0 12px 40px var(--accentGlow)" : "var(--cardShadow)" }}
+      style={{ background: "var(--surface)", border: hover ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "all 0.3s", transform: hover ? "translateY(-4px)" : "none", boxShadow: hover ? "0 12px 40px var(--accentGlow)" : "var(--cardShadow)" }}
     >
       <div style={{ height: 188, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", background: "linear-gradient(135deg, rgba(255,0,102,0.12), rgba(0,229,255,0.12))" }}>
         {collage.map((image, idx) => (
           <SafeImage key={(image.src || image.fallback || "img") + idx} src={image.src} fallbackSrc={image.fallback} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
         ))}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.2) 52%, rgba(10,10,15,0.05) 100%)" }} />
-        <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Outfit,sans-serif", fontWeight: 600, color: "#fff", maxWidth: "75%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat?.emoji} {cat?.label[lang] || cat?.label.en}</div>
+
+        {/* BADGES — top-left corner */}
+        <div style={{ position: "absolute", top: 10, left: 10, display: "flex", flexDirection: "column", gap: 4, zIndex: 5 }}>
+          {isTrending && (
+            <div style={{
+              background: "linear-gradient(135deg, #ffd700, #ffaa00)",
+              borderRadius: 6,
+              padding: "2px 8px",
+              fontSize: 9,
+              fontFamily: "'Space Mono',monospace",
+              fontWeight: 700,
+              color: "#000",
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              boxShadow: "0 2px 8px rgba(255,215,0,0.4)",
+            }}>TRENDING</div>
+          )}
+          {isNew && (
+            <div style={{
+              background: "linear-gradient(135deg, #00e5ff, #00b8d4)",
+              borderRadius: 6,
+              padding: "2px 8px",
+              fontSize: 9,
+              fontFamily: "'Space Mono',monospace",
+              fontWeight: 700,
+              color: "#000",
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              boxShadow: "0 2px 8px rgba(0,229,255,0.4)",
+            }}>NEW</div>
+          )}
+        </div>
+
+        <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Outfit,sans-serif", fontWeight: 600, color: "#fff", maxWidth: "75%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat?.emoji} {cat?.label[lang] || cat?.label.en}</div>
         <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontFamily: "Space Mono,monospace", color: "#00e5ff" }}>{tournament.items.length} {t.entries}</div>
-        <div style={{ position: "absolute", left: 14, right: 14, bottom: 14 }}>
+        <div style={{ position: "absolute", left: 14, right: 14, bottom: 40 }}>
           <h3 style={{ fontFamily: "Outfit,sans-serif", fontSize: 20, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.15, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 4px 18px rgba(0,0,0,0.55)" }}>{tournament.title}</h3>
         </div>
       </div>
@@ -168,11 +264,16 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
   );
 });
 
-export default function HomeView({ tournaments, dailyChallenge, recentPlays, resumeGame, onResumeGame, onSelect, setView, onQuickMode, onDailyChallenge, lang, sortMode, setSortMode, T, CATEGORIES }) {
+export default function HomeView({ tournaments, dailyChallenge, recentPlays, resumeGame, onResumeGame, onSelect, setView, onQuickMode, onDailyChallenge, lang, sortMode, setSortMode, T, CATEGORIES, isLoading }) {
   const [fc, setFc] = useState("all");
+  const [search, setSearch] = useState("");
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
+
   const catFiltered = fc === "all" ? tournaments : tournaments.filter((tr) => tr.category === fc);
-  const filtered = [...catFiltered].sort((a, b) => {
+  const searchFiltered = search.trim()
+    ? catFiltered.filter((tr) => tr.title.toLowerCase().includes(search.toLowerCase().trim()))
+    : catFiltered;
+  const filtered = [...searchFiltered].sort((a, b) => {
     if (sortMode === "new") return (b.id || "").localeCompare(a.id || "");
     if (sortMode === "az") return (a.title || "").localeCompare(b.title || "");
     if (a.featured && !b.featured) return -1;
@@ -195,23 +296,84 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
       <ResumeBanner resumeGame={resumeGame} onResumeGame={onResumeGame} lang={lang} T={T} />
       <RecentlyPlayed recentPlays={recentPlays} tournaments={tournaments} onSelect={onSelect} lang={lang} T={T} />
 
+      {/* SEARCH BAR */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ position: "relative", maxWidth: 480, margin: "0 auto" }}>
+          <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 18, pointerEvents: "none", opacity: 0.5 }}>🔍</span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tournaments..."
+            style={{
+              width: "100%",
+              padding: "12px 16px 12px 46px",
+              borderRadius: 14,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              color: "var(--text)",
+              fontFamily: "'Outfit',sans-serif",
+              fontSize: 15,
+              outline: "none",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+              boxSizing: "border-box",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "var(--accent)";
+              e.currentTarget.style.boxShadow = "0 0 0 3px var(--accentGlow)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "var(--border)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--textDim)", cursor: "pointer", fontSize: 14, padding: 4 }}>✕</button>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
-        <button onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: `1px solid ${fc === "all" ? "var(--accent)" : "var(--border)"}`, borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
+        <button onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
         {CATEGORIES.filter((c) => c.id !== "custom").map((cat) => (
-          <button key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: `1px solid ${fc === cat.id ? "var(--accent)" : "var(--border)"}`, borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
+          <button key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
         ))}
       </div>
 
       <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
         {[["popular", "🔥 Popular"], ["new", "✨ New"], ["az", "A→Z"]].map(([k, label]) => (
-          <button key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: `1px solid ${sortMode === k ? "var(--accent)" : "var(--border)"}`, borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
+          <button key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
         ))}
       </div>
 
-      <div className="vs-tournament-grid">
-        {filtered.map((tr) => <TournamentCard key={tr.id} tournament={tr} onClick={() => onSelect(tr)} lang={lang} T={T} CATEGORIES={CATEGORIES} />)}
-      </div>
-      {filtered.length === 0 && <div style={{ textAlign: "center", padding: 60, color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 16 }}>{t.noCat}</div>}
+      {/* Loading Skeleton */}
+      {isLoading && (
+        <div className="vs-tournament-grid" style={{ marginBottom: 20 }}>
+          {[0, 1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      )}
+
+      {/* Tournament Grid */}
+      {!isLoading && (
+        <div className="vs-tournament-grid">
+          {filtered.map((tr) => <TournamentCard key={tr.id} tournament={tr} onClick={() => onSelect(tr)} lang={lang} T={T} CATEGORIES={CATEGORIES} />)}
+        </div>
+      )}
+
+      {/* No results */}
+      {!isLoading && filtered.length === 0 && (
+        <div style={{ textAlign: "center", padding: 60, color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 16 }}>
+          {search ? (
+            <>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>No results for "{search}"</div>
+              <div style={{ fontSize: 14 }}>Try a different search term</div>
+            </>
+          ) : (
+            <div>{t.noCat}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -4,16 +4,18 @@ import { getDailyChallengeIndex, normalizeTournamentRecords } from "../lib/tourn
 
 export function useTournaments(initialTournaments, makeItemId, fallbackImage) {
   const [tournaments, setTournaments] = useState(initialTournaments);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
+      setIsLoading(true);
       try {
         const res = await fetch(API_ENDPOINTS.activeTournaments);
-        if (!res.ok) return;
+        if (!res.ok) { setIsLoading(false); return; }
         const data = await res.json();
-        if (!data.items?.length || cancelled) return;
+        if (!data.items?.length || cancelled) { setIsLoading(false); return; }
         const validTournaments = normalizeTournamentRecords(
           data.items,
           makeItemId,
@@ -24,6 +26,8 @@ export function useTournaments(initialTournaments, makeItemId, fallbackImage) {
         }
       } catch (e) {
         console.log("DB load fallback to sample data:", e);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
 
@@ -37,5 +41,5 @@ export function useTournaments(initialTournaments, makeItemId, fallbackImage) {
     return tournaments[dayIdx];
   }, [tournaments]);
 
-  return { tournaments, setTournaments, dailyChallenge };
+  return { tournaments, setTournaments, dailyChallenge, isLoading };
 }

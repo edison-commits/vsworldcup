@@ -58,3 +58,26 @@ test('buildGeneratePrompt adds stricter retry instructions', () => {
   assert.match(retry, /previous answer was not valid parseable JSON/);
   assert.match(retry, /Return ONLY a JSON object/);
 });
+
+test('buildAnthropicGenerateRequest uses production-proven model fallback and token budget', () => {
+  const { buildAnthropicGenerateRequest } = require('./proxy');
+  const previousModel = process.env.ANTHROPIC_MODEL;
+  delete process.env.ANTHROPIC_MODEL;
+  try {
+    const fallbackBody = buildAnthropicGenerateRequest('best ramen', 8, false);
+    assert.equal(fallbackBody.model, 'claude-haiku-4-5-20251001');
+    assert.equal(fallbackBody.max_tokens, 4096);
+    assert.match(fallbackBody.messages[0].content, /exactly 8 entries/);
+
+    process.env.ANTHROPIC_MODEL = 'claude-test-model';
+    const overrideBody = buildAnthropicGenerateRequest('best ramen', 8, true);
+    assert.equal(overrideBody.model, 'claude-test-model');
+    assert.match(overrideBody.messages[0].content, /previous answer was not valid parseable JSON/);
+  } finally {
+    if (previousModel === undefined) {
+      delete process.env.ANTHROPIC_MODEL;
+    } else {
+      process.env.ANTHROPIC_MODEL = previousModel;
+    }
+  }
+});

@@ -6,7 +6,7 @@ app.use(cors({ origin: ['https://vsworldcup.com', 'https://www.vsworldcup.com'] 
 app.use(express.json());
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
 const VALID_CATEGORIES = new Set([
   'food', 'travel', 'celebrities', 'athletes', 'movies', 'music', 'games',
   'animals', 'sports', 'weapons', 'cars', 'anime', 'fashion', 'drinks', 'custom'
@@ -113,6 +113,17 @@ function buildGeneratePrompt(prompt, num, isRetry = false) {
   return `${retryLine}Generate a bracket tournament with exactly ${num} entries for: "${prompt}". Return ONLY a JSON object with this format, no other text: {"title":"Tournament Title","category":"food","entries":[{"name":"Entry 1","tagline":"Short tagline"},{"name":"Entry 2","tagline":"Short tagline"}]}. Category must be one of: food,travel,celebrities,athletes,movies,music,games,animals,sports,weapons,cars,anime,fashion,drinks,custom. Keep names short (under 30 chars). Keep taglines fun and under 60 chars.`;
 }
 
+function buildAnthropicGenerateRequest(prompt, num, isRetry = false) {
+  return {
+    model: process.env.ANTHROPIC_MODEL || DEFAULT_ANTHROPIC_MODEL,
+    max_tokens: 4096,
+    messages: [{
+      role: 'user',
+      content: buildGeneratePrompt(prompt, num, isRetry)
+    }]
+  };
+}
+
 async function callAnthropicGenerate(prompt, num, isRetry = false) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -121,14 +132,7 @@ async function callAnthropicGenerate(prompt, num, isRetry = false) {
       'x-api-key': API_KEY,
       'anthropic-version': '2023-06-01'
     },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: buildGeneratePrompt(prompt, num, isRetry)
-      }]
-    })
+    body: JSON.stringify(buildAnthropicGenerateRequest(prompt, num, isRetry))
   });
 
   if (!response.ok) {
@@ -213,5 +217,6 @@ module.exports = {
   parseGeneratedTournament,
   validateGeneratedTournament,
   normalizeGenerateCount,
-  buildGeneratePrompt
+  buildGeneratePrompt,
+  buildAnthropicGenerateRequest
 };

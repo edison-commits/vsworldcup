@@ -115,3 +115,102 @@ test('buildAnthropicGenerateRequest uses production-proven model fallback and to
     }
   }
 });
+
+test('health route exposes production-compatible service metadata', async () => {
+  const previousFetch = global.fetch;
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/health`);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.status, 'ok');
+    assert.equal(body.service, 'vsworldcup-api');
+    assert.match(body.timestamp, /^\d{4}-\d{2}-\d{2}T/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  }
+});
+
+test('single-record proxy forwards method, auth header, body, and query string', async () => {
+  const previousFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({ id: 'abc123', ok: true }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  };
+
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/api/collections/tournaments/records/abc123?expand=entries`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer user-token'
+      },
+      body: JSON.stringify({ title: 'Updated' })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 202);
+    assert.deepEqual(body, { id: 'abc123', ok: true });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'http://localhost:8090/api/collections/tournaments/records/abc123?expand=entries');
+    assert.equal(calls[0].options.method, 'PATCH');
+    assert.equal(calls[0].options.headers.Authorization, 'Bearer user-token');
+    assert.equal(calls[0].options.body, JSON.stringify({ title: 'Updated' }));
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    global.fetch = previousFetch;
+  }
+});
+
+test('plays increment reads current count and patches increment with admin token when available', async () => {
+  const previousFetch = global.fetch;
+  const previousToken = process.env.PB_ADMIN_TOKEN;
+  const calls = [];
+  process.env.PB_ADMIN_TOKEN = 'pb-test-token';
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    if (String(url).endsWith('?fields=plays')) {
+      return new Response(JSON.stringify({ plays: 41 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    return new Response(JSON.stringify({ plays: 42 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  };
+
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/api/plays/increment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tournament_id: 'tour123' })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(body, { ok: true, plays: 42 });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].url, 'http://localhost:8090/api/collections/tournaments/records/tour123?fields=plays');
+    assert.equal(calls[1].url, 'http://localhost:8090/api/collections/tournaments/records/tour123');
+    assert.equal(calls[1].options.method, 'PATCH');
+    assert.equal(calls[1].options.headers.Authorization, 'Bearer pb-test-token');
+    assert.equal(calls[1].options.body, JSON.stringify({ plays: 42 }));
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    global.fetch = previousFetch;
+    if (previousToken === undefined) {
+      delete process.env.PB_ADMIN_TOKEN;
+    } else {
+      process.env.PB_ADMIN_TOKEN = previousToken;
+    }
+  }
+});

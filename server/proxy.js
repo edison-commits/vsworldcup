@@ -181,28 +181,97 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'vsworldcup-api', timestamp: new Date().toISOString() }));
 
-// Generic proxy for PocketBase collection requests
-app.all("/api/collections/:collection/records", async (req, res) => {
+function buildPocketBaseUrl(collection, id, query) {
+  const params = new URLSearchParams(query);
+  const baseUrl = id
+    ? `http://localhost:8090/api/collections/${collection}/records/${id}`
+    : `http://localhost:8090/api/collections/${collection}/records`;
+  return params.size > 0 ? `${baseUrl}?${params}` : baseUrl;
+}
+
+function buildPocketBaseProxyOptions(req) {
+  return {
+    method: req.method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {})
+    },
+    ...(['POST', 'PATCH', 'PUT'].includes(req.method) ? { body: JSON.stringify(req.body) } : {})
+  };
+}
+
+async function proxyPocketBaseRequest(req, res, id) {
+  const { collection } = req.params;
+  const pbUrl = buildPocketBaseUrl(collection, id, req.query);
+  const pbRes = await fetch(pbUrl, buildPocketBaseProxyOptions(req));
+  const text = await pbRes.text();
+  res.status(pbRes.status).type('application/json').send(text);
+}
+
+// Collection-level proxy (GET, POST)
+app.all('/api/collections/:collection/records', async (req, res) => {
   try {
-    const { collection } = req.params;
-    const params = new URLSearchParams(req.query);
-    const baseUrl = `http://localhost:8090/api/collections/${collection}/records`;
-    const pbUrl = params.size > 0 ? `${baseUrl}?${params}` : baseUrl;
-    const pbRes = await fetch(pbUrl, {
-      method: req.method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(req.headers.authorization ? { "Authorization": req.headers.authorization } : {}),
-      },
-      ...(["POST", "PATCH", "PUT"].includes(req.method) ? { body: JSON.stringify(req.body) } : {}),
-    });
-    const text = await pbRes.text();
-    res.status(pbRes.status).type("application/json").send(text);
+    await proxyPocketBaseRequest(req, res);
   } catch (err) {
-    console.error("Collection proxy error:", err.message);
-    res.status(500).json({ error: "Proxy error" });
+    console.error('Collection proxy error:', err.message);
+    res.status(500).json({ error: 'Proxy error' });
+  }
+});
+
+// Single-record proxy (GET, PATCH, PUT, DELETE)
+app.all('/api/collections/:collection/records/:id', async (req, res) => {
+  try {
+    await proxyPocketBaseRequest(req, res, req.params.id);
+  } catch (err) {
+    console.error('Record proxy error:', err.message);
+    res.status(500).json({ error: 'Proxy error' });
+  }
+});
+
+// POST /api/plays/increment — atomically increment plays count in PocketBase
+app.post('/api/plays/increment', async (req, res) => {
+  try {
+    const { tournament_id } = req.body;
+    if (!tournament_id || typeof tournament_id !== 'string') {
+      return res.status(400).json({ error: 'tournament_id required' });
+    }
+
+    const getRes = await fetch(
+      `http://localhost:8090/api/collections/tournaments/records/${tournament_id}?fields=plays`
+    );
+    if (!getRes.ok) {
+      const err = await getRes.text();
+      console.error('Plays increment GET error:', err);
+      return res.status(getRes.status).json({ error: 'Failed to read plays' });
+    }
+
+    const data = await getRes.json();
+    const currentPlays = typeof data.plays === 'number' ? data.plays : 0;
+    const updateRes = await fetch(
+      `http://localhost:8090/api/collections/tournaments/records/${tournament_id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(process.env.PB_ADMIN_TOKEN ? { Authorization: `Bearer ${process.env.PB_ADMIN_TOKEN}` } : {})
+        },
+        body: JSON.stringify({ plays: currentPlays + 1 })
+      }
+    );
+    if (!updateRes.ok) {
+      const err = await updateRes.text();
+      console.error('Plays increment PATCH error:', err);
+      return res.status(updateRes.status).json({ error: 'Failed to update plays' });
+    }
+
+    const updated = await updateRes.json();
+    res.json({ ok: true, plays: updated.plays });
+  } catch (err) {
+    console.error('Plays increment error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

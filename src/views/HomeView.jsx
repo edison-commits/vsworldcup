@@ -26,6 +26,7 @@ function cardCollageItems(items = []) {
   return [0, 1, 2, 3].map((idx) => ({
     src: items[idx]?.img || fallback,
     fallback: items[idx]?.fallbackImg || fallback,
+    name: items[idx]?.name || items[0]?.name || "Tournament entry",
   }));
 }
 
@@ -213,7 +214,7 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
     >
       <div style={{ height: 188, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", background: "linear-gradient(135deg, rgba(255,0,102,0.12), rgba(0,229,255,0.12))" }}>
         {collage.map((image, idx) => (
-          <SafeImage key={(image.src || image.fallback || "img") + idx} src={image.src} fallbackSrc={image.fallback} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
+          <SafeImage key={(image.src || image.fallback || "img") + idx} src={image.src} fallbackSrc={image.fallback} alt={image.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
         ))}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.2) 52%, rgba(10,10,15,0.05) 100%)" }} />
 
@@ -348,16 +349,16 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
-        <button onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
+      <div className="vs-category-rail" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
+        <button className="vs-chip" onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
         {CATEGORIES.filter((c) => c.id !== "custom").map((cat) => (
-          <button key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
+          <button className="vs-chip" key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
+      <div className="vs-sort-rail" style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
         {[["popular", "🔥 Popular"], ["new", "✨ New"], ["az", "A→Z"]].map(([k, label]) => (
-          <button key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
+          <button className="vs-chip" key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
         ))}
       </div>
 

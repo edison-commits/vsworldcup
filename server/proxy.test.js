@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  app,
   extractBalancedJsonObject,
   parseGeneratedTournament,
   validateGeneratedTournament,
@@ -57,6 +58,39 @@ test('buildGeneratePrompt adds stricter retry instructions', () => {
   assert.match(first, /exactly 16 entries/);
   assert.match(retry, /previous answer was not valid parseable JSON/);
   assert.match(retry, /Return ONLY a JSON object/);
+});
+
+test('generate route rejects invalid counts before API configuration or provider calls', async () => {
+  const previousApiKey = process.env.ANTHROPIC_API_KEY;
+  const previousFetch = global.fetch;
+  delete process.env.ANTHROPIC_API_KEY;
+  let providerCalled = false;
+  global.fetch = async () => {
+    providerCalled = true;
+    throw new Error('provider should not be called for invalid count');
+  };
+
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'best ramen', count: '4abc' })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.error, 'Invalid count');
+    assert.equal(providerCalled, false);
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    global.fetch = previousFetch;
+    if (previousApiKey === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = previousApiKey;
+    }
+  }
 });
 
 test('buildAnthropicGenerateRequest uses production-proven model fallback and token budget', () => {

@@ -153,15 +153,14 @@ app.post('/api/generate', async (req, res) => {
     if (!prompt || typeof prompt !== 'string' || prompt.length > 200) {
       return res.status(400).json({ error: 'Invalid prompt' });
     }
-    if (!API_KEY) {
-      return res.status(500).json({ error: 'Generation is not configured' });
-    }
-
     let num;
     try {
       num = normalizeGenerateCount(count);
     } catch (err) {
-      return res.status(400).json({ error: err.message });
+      return res.status(400).json({ error: 'Invalid count', detail: err.message });
+    }
+    if (!API_KEY) {
+      return res.status(500).json({ error: 'Generation is not configured' });
     }
     let lastError;
 

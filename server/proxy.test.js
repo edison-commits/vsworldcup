@@ -223,6 +223,11 @@ test('inferCountryCode uses direct country fields and locale fallbacks', () => {
   assert.equal(inferCountryCode({ locale: 'en-US' }), 'US');
   assert.equal(inferCountryCode({ locale: 'ko_KR' }), 'KR');
   assert.equal(inferCountryCode({ timezone: 'Asia/Tokyo' }), 'JP');
+  assert.equal(inferCountryCode({ timezone: 'America/Los_Angeles' }), 'US');
+  assert.equal(inferCountryCode({ timezone: 'America/Toronto' }), 'CA');
+  assert.equal(inferCountryCode({ timezone: 'America/Mexico_City' }), 'MX');
+  assert.equal(inferCountryCode({ timezone: 'America/Sao_Paulo' }), 'BR');
+  assert.equal(inferCountryCode({ timezone: 'America/Argentina/Buenos_Aires' }), '');
   assert.equal(inferCountryCode({ locale: 'en' }), '');
 });
 

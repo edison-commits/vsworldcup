@@ -222,8 +222,23 @@ function inferCountryCode(record = {}) {
   const localeRegion = locale.match(/[-_]([A-Za-z]{2})(?:\b|$)/)?.[1];
   if (localeRegion) return normalizeCountryCode(localeRegion);
   const timezone = String(record.timezone || '').trim();
+  const timezoneCountryByName = {
+    'America/New_York': 'US',
+    'America/Chicago': 'US',
+    'America/Denver': 'US',
+    'America/Phoenix': 'US',
+    'America/Los_Angeles': 'US',
+    'America/Anchorage': 'US',
+    'Pacific/Honolulu': 'US',
+    'America/Toronto': 'CA',
+    'America/Vancouver': 'CA',
+    'America/Montreal': 'CA',
+    'America/Mexico_City': 'MX',
+    'America/Sao_Paulo': 'BR'
+  };
+  if (timezoneCountryByName[timezone]) return timezoneCountryByName[timezone];
   const timezoneHints = [
-    [/^America\//, 'US'], [/^Europe\/London$/, 'GB'], [/^Europe\/Paris$/, 'FR'], [/^Europe\/Berlin$/, 'DE'],
+    [/^Europe\/London$/, 'GB'], [/^Europe\/Paris$/, 'FR'], [/^Europe\/Berlin$/, 'DE'],
     [/^Asia\/Seoul$/, 'KR'], [/^Asia\/Tokyo$/, 'JP'], [/^Asia\/Shanghai$/, 'CN'], [/^Asia\/Bangkok$/, 'TH'],
     [/^Asia\/Ho_Chi_Minh$/, 'VN'], [/^Australia\//, 'AU']
   ];

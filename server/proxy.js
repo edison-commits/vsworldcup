@@ -184,6 +184,128 @@ app.post('/api/generate', async (req, res) => {
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'vsworldcup-api', timestamp: new Date().toISOString() }));
 
+const COUNTRY_NAME_OVERRIDES = {
+  US: 'United States', GB: 'United Kingdom', KR: 'South Korea', JP: 'Japan', CN: 'China',
+  BR: 'Brazil', VN: 'Vietnam', TH: 'Thailand', DE: 'Germany', FR: 'France', ES: 'Spain',
+  MX: 'Mexico', CA: 'Canada', AU: 'Australia', IN: 'India', ID: 'Indonesia', PH: 'Philippines'
+};
+
+function normalizeCountryCode(value) {
+  const code = String(value || '').trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(code) && code !== 'XX' ? code : '';
+}
+
+function countryNameFromCode(code) {
+  const normalized = normalizeCountryCode(code);
+  if (!normalized) return 'Unknown';
+  if (COUNTRY_NAME_OVERRIDES[normalized]) return COUNTRY_NAME_OVERRIDES[normalized];
+  try {
+    if (typeof Intl !== 'undefined' && Intl.DisplayNames) {
+      return new Intl.DisplayNames(['en'], { type: 'region' }).of(normalized) || normalized;
+    }
+  } catch (err) {
+    // Fall through to the region code when Intl.DisplayNames is unavailable.
+  }
+  return normalized;
+}
+
+function countryFlagEmoji(code) {
+  const normalized = normalizeCountryCode(code);
+  if (!normalized) return '🌐';
+  return normalized.replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+}
+
+function inferCountryCode(record = {}) {
+  const direct = normalizeCountryCode(record.country_code || record.countryCode || record.country);
+  if (direct) return direct;
+  const locale = String(record.locale || '').trim();
+  const localeRegion = locale.match(/[-_]([A-Za-z]{2})(?:\b|$)/)?.[1];
+  if (localeRegion) return normalizeCountryCode(localeRegion);
+  const timezone = String(record.timezone || '').trim();
+  const timezoneHints = [
+    [/^America\//, 'US'], [/^Europe\/London$/, 'GB'], [/^Europe\/Paris$/, 'FR'], [/^Europe\/Berlin$/, 'DE'],
+    [/^Asia\/Seoul$/, 'KR'], [/^Asia\/Tokyo$/, 'JP'], [/^Asia\/Shanghai$/, 'CN'], [/^Asia\/Bangkok$/, 'TH'],
+    [/^Asia\/Ho_Chi_Minh$/, 'VN'], [/^Australia\//, 'AU']
+  ];
+  return timezoneHints.find(([pattern]) => pattern.test(timezone))?.[1] || '';
+}
+
+function buildCountryWinnerStats(records = []) {
+  const byCountry = new Map();
+  for (const record of records || []) {
+    const champion = String(record?.champion_name || '').trim();
+    if (!champion) continue;
+    const code = inferCountryCode(record) || 'XX';
+    if (!byCountry.has(code)) {
+      byCountry.set(code, {
+        country_code: code,
+        country: code === 'XX' ? 'Unknown' : countryNameFromCode(code),
+        flag: countryFlagEmoji(code),
+        total_sessions: 0,
+        champions: new Map()
+      });
+    }
+    const bucket = byCountry.get(code);
+    bucket.total_sessions += 1;
+    bucket.champions.set(champion, (bucket.champions.get(champion) || 0) + 1);
+  }
+  return [...byCountry.values()].map((bucket) => {
+    const championCounts = [...bucket.champions.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const [top_item, wins] = championCounts[0] || ['Unknown', 0];
+    return {
+      country_code: bucket.country_code,
+      country: bucket.country,
+      flag: bucket.flag,
+      top_item,
+      wins,
+      total_sessions: bucket.total_sessions,
+      share: bucket.total_sessions ? Math.round((wins / bucket.total_sessions) * 100) : 0,
+      contenders: championCounts.slice(0, 5).map(([name, count]) => ({ name, count }))
+    };
+  }).sort((a, b) => b.total_sessions - a.total_sessions || a.country.localeCompare(b.country));
+}
+
+async function fetchPocketBasePlaySessions(tournamentId, maxRecords = 1000) {
+  const token = process.env.PB_ADMIN_TOKEN;
+  const perPage = 200;
+  const records = [];
+  for (let page = 1; records.length < maxRecords; page += 1) {
+    const params = new URLSearchParams({
+      page: String(page),
+      perPage: String(Math.min(perPage, maxRecords - records.length)),
+      sort: '-created',
+      filter: `tournament_id="${String(tournamentId).replace(/"/g, '\\"')}"`
+    });
+    const pbRes = await fetch(`http://localhost:8090/api/collections/play_sessions/records?${params}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!pbRes.ok) {
+      const detail = await pbRes.text();
+      const err = new Error(`PocketBase play_sessions read failed: ${pbRes.status}`);
+      err.status = pbRes.status;
+      err.detail = detail.slice(0, 500);
+      throw err;
+    }
+    const data = await pbRes.json();
+    records.push(...(data.items || []));
+    if (page >= (data.totalPages || 1) || !(data.items || []).length) break;
+  }
+  return records;
+}
+
+app.get('/api/stats/tournaments/:tournamentId/country-winners', async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    if (!tournamentId || tournamentId.length > 100) return res.status(400).json({ error: 'Invalid tournamentId' });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 1000, 1), 2000);
+    const records = await fetchPocketBasePlaySessions(tournamentId, limit);
+    res.json({ tournament_id: tournamentId, countries: buildCountryWinnerStats(records), sample_size: records.length });
+  } catch (err) {
+    console.error('Country winners stats error:', err.message, err.detail || '');
+    res.status(502).json({ error: 'Failed to build country winner stats' });
+  }
+});
+
 function buildPocketBaseUrl(collection, id, query) {
   const params = new URLSearchParams(query);
   const baseUrl = id
@@ -286,5 +408,8 @@ module.exports = {
   validateGeneratedTournament,
   normalizeGenerateCount,
   buildGeneratePrompt,
-  buildAnthropicGenerateRequest
+  buildAnthropicGenerateRequest,
+  normalizeCountryCode,
+  inferCountryCode,
+  buildCountryWinnerStats
 };

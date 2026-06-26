@@ -6,7 +6,9 @@ const {
   parseGeneratedTournament,
   validateGeneratedTournament,
   normalizeGenerateCount,
-  buildGeneratePrompt
+  buildGeneratePrompt,
+  inferCountryCode,
+  buildCountryWinnerStats
 } = require('./proxy');
 
 test('extractBalancedJsonObject ignores prose and braces inside strings', () => {
@@ -204,6 +206,82 @@ test('plays increment reads current count and patches increment with admin token
     assert.equal(calls[1].options.method, 'PATCH');
     assert.equal(calls[1].options.headers.Authorization, 'Bearer pb-test-token');
     assert.equal(calls[1].options.body, JSON.stringify({ plays: 42 }));
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    global.fetch = previousFetch;
+    if (previousToken === undefined) {
+      delete process.env.PB_ADMIN_TOKEN;
+    } else {
+      process.env.PB_ADMIN_TOKEN = previousToken;
+    }
+  }
+});
+
+
+test('inferCountryCode uses direct country fields and locale fallbacks', () => {
+  assert.equal(inferCountryCode({ country_code: 'kr' }), 'KR');
+  assert.equal(inferCountryCode({ locale: 'en-US' }), 'US');
+  assert.equal(inferCountryCode({ locale: 'ko_KR' }), 'KR');
+  assert.equal(inferCountryCode({ timezone: 'Asia/Tokyo' }), 'JP');
+  assert.equal(inferCountryCode({ locale: 'en' }), '');
+});
+
+test('buildCountryWinnerStats returns the #1 champion per country', () => {
+  const stats = buildCountryWinnerStats([
+    { locale: 'en-US', champion_name: 'Pizza' },
+    { locale: 'en-US', champion_name: 'Pizza' },
+    { locale: 'en-US', champion_name: 'Tacos' },
+    { locale: 'ko-KR', champion_name: 'Ramen' },
+    { locale: 'ko-KR', champion_name: 'Ramen' },
+    { locale: 'ko-KR', champion_name: 'Pizza' }
+  ]);
+  const us = stats.find((country) => country.country_code === 'US');
+  const kr = stats.find((country) => country.country_code === 'KR');
+  assert.equal(us.top_item, 'Pizza');
+  assert.equal(us.wins, 2);
+  assert.equal(us.total_sessions, 3);
+  assert.equal(us.share, 67);
+  assert.equal(kr.top_item, 'Ramen');
+});
+
+test('country winners route reads play sessions and returns country stats', async () => {
+  const previousFetch = global.fetch;
+  const previousToken = process.env.PB_ADMIN_TOKEN;
+  const calls = [];
+  process.env.PB_ADMIN_TOKEN = 'pb-country-token';
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({
+      page: 1,
+      totalPages: 1,
+      items: [
+        { locale: 'en-US', champion_name: 'Pizza' },
+        { locale: 'en-US', champion_name: 'Pizza' },
+        { locale: 'en-US', champion_name: 'Tacos' },
+        { locale: 'ko-KR', champion_name: 'Ramen' }
+      ]
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  };
+
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/api/stats/tournaments/tour123/country-winners?limit=50`);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.tournament_id, 'tour123');
+    assert.equal(body.sample_size, 4);
+    assert.equal(body.countries[0].country_code, 'US');
+    assert.equal(body.countries[0].top_item, 'Pizza');
+    assert.equal(body.countries[0].share, 67);
+    assert.equal(calls.length, 1);
+    assert.match(String(calls[0].url), /play_sessions\/records\?/);
+    assert.match(String(calls[0].url), /perPage=50/);
+    assert.match(String(calls[0].url), /tournament_id/);
+    assert.equal(calls[0].options.headers.Authorization, 'Bearer pb-country-token');
   } finally {
     await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
     global.fetch = previousFetch;

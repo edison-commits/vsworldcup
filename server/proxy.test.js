@@ -4,6 +4,7 @@ const {
   extractBalancedJsonObject,
   parseGeneratedTournament,
   validateGeneratedTournament,
+  normalizeGenerateCount,
   buildGeneratePrompt
 } = require('./proxy');
 
@@ -37,6 +38,13 @@ test('validateGeneratedTournament rejects wrong entry counts', () => {
     () => validateGeneratedTournament({ title: 'Too short', category: 'food', entries: [{ name: 'A' }] }, 2),
     /expected 2/
   );
+});
+
+test('normalizeGenerateCount only accepts bracket-safe powers of two', () => {
+  assert.equal(normalizeGenerateCount('4'), 4);
+  assert.equal(normalizeGenerateCount(16), 16);
+  assert.throws(() => normalizeGenerateCount(6), /4, 8, 16, or 32/);
+  assert.throws(() => normalizeGenerateCount(64), /4, 8, 16, or 32/);
 });
 
 test('buildGeneratePrompt adds stricter retry instructions', () => {

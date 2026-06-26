@@ -93,6 +93,14 @@ function parseGeneratedTournament(text, expectedCount) {
   return validateGeneratedTournament(JSON.parse(jsonText), expectedCount);
 }
 
+function normalizeGenerateCount(count) {
+  const num = Number.parseInt(count, 10);
+  if (![4, 8, 16, 32].includes(num)) {
+    throw new Error('Count must be one of 4, 8, 16, or 32');
+  }
+  return num;
+}
+
 function buildGeneratePrompt(prompt, num, isRetry = false) {
   const retryLine = isRetry
     ? 'Your previous answer was not valid parseable JSON. Do not include markdown, comments, trailing commas, explanations, or extra keys. '
@@ -140,7 +148,12 @@ app.post('/api/generate', async (req, res) => {
       return res.status(500).json({ error: 'Generation is not configured' });
     }
 
-    const num = Math.min(Math.max(parseInt(count, 10) || 16, 4), 32);
+    let num;
+    try {
+      num = normalizeGenerateCount(count);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
     let lastError;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -194,5 +207,6 @@ module.exports = {
   extractBalancedJsonObject,
   parseGeneratedTournament,
   validateGeneratedTournament,
+  normalizeGenerateCount,
   buildGeneratePrompt
 };

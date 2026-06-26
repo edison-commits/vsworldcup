@@ -94,7 +94,12 @@ function parseGeneratedTournament(text, expectedCount) {
 }
 
 function normalizeGenerateCount(count) {
-  const num = Number.parseInt(count, 10);
+  const num = typeof count === 'number'
+    ? count
+    : (typeof count === 'string' && count.trim() !== '' ? Number(count.trim()) : Number.NaN);
+  if (!Number.isInteger(num)) {
+    throw new Error('Count must be one of 4, 8, 16, or 32');
+  }
   if (![4, 8, 16, 32].includes(num)) {
     throw new Error('Count must be one of 4, 8, 16, or 32');
   }

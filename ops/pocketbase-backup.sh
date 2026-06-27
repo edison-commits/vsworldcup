@@ -51,22 +51,37 @@ if ! mkdir "$lock_dir" 2>/dev/null; then
 fi
 cleanup() {
   rm -f "${archive_tmp:-}" "${checksum_tmp:-}"
-  rm -rf "$lock_dir"
+  rm -rf "${staging_parent:-}" "$lock_dir"
 }
 trap cleanup EXIT INT TERM
 
 timestamp=$(date -u '+%Y%m%dT%H%M%SZ')
-source_parent=$(cd "$(dirname "$PB_DATA_DIR")" && pwd -P)
-source_base=$(basename "$PB_DATA_DIR")
+source_base=$(basename "$pb_data_resolved")
 archive="$BACKUP_DIR/pocketbase-${timestamp}.tar.gz"
 checksum="$archive.sha256"
 archive_tmp="$archive.tmp.$$"
 checksum_tmp="$checksum.tmp.$$"
+staging_parent="$BACKUP_DIR/.pocketbase-backup-staging.$$"
+staging_dir="$staging_parent/$source_base"
 
 log "source=$PB_DATA_DIR"
 log "destination=$archive"
 
-tar -czf "$archive_tmp" -C "$source_parent" "$source_base"
+command -v rsync >/dev/null 2>&1 || fail 'rsync is required to stage PocketBase storage files'
+mkdir -p "$staging_dir"
+
+if [ -f "$pb_data_resolved/data.db" ]; then
+  command -v sqlite3 >/dev/null 2>&1 || fail 'sqlite3 is required to create a consistent data.db backup'
+  log 'sqlite-online-backup=data.db'
+  sqlite3 "$pb_data_resolved/data.db" ".backup '$staging_dir/data.db'"
+  integrity=$(sqlite3 "$staging_dir/data.db" 'PRAGMA integrity_check;')
+  [ "$integrity" = 'ok' ] || fail "staged SQLite integrity_check failed: $integrity"
+  rsync -a --exclude '/data.db' -- "$pb_data_resolved/" "$staging_dir/"
+else
+  rsync -a -- "$pb_data_resolved/" "$staging_dir/"
+fi
+
+tar -czf "$archive_tmp" -C "$staging_parent" "$source_base"
 [ -s "$archive_tmp" ] || fail "archive was not created or is empty: $archive_tmp"
 tar -tzf "$archive_tmp" >/dev/null
 mv "$archive_tmp" "$archive"

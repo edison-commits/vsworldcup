@@ -12,11 +12,12 @@ trap cleanup EXIT INT TERM
 PB_FAKE="$TMP_DIR/pb_data"
 BACKUPS="$TMP_DIR/backups"
 mkdir -p "$PB_FAKE/storage/images" "$PB_FAKE/backups"
-printf 'fake sqlite bytes\n' > "$PB_FAKE/data.db"
+sqlite3 "$PB_FAKE/data.db" "CREATE TABLE smoke (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO smoke (value) VALUES ('fake sqlite row');"
 printf 'fake image bytes\n' > "$PB_FAKE/storage/images/example.txt"
 
 output=$(PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$BACKUPS" bash "$SCRIPT")
 printf '%s\n' "$output"
+grep -q 'sqlite-online-backup=data.db' <<< "$output"
 
 archive=$(find "$BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' | sort | tail -1)
 [ -n "$archive" ] || { echo 'expected archive file' >&2; exit 1; }
@@ -37,11 +38,18 @@ mkdir -p "$RESTORE_DIR"
 tar -xzf "$archive" -C "$RESTORE_DIR"
 [ -f "$RESTORE_DIR/pb_data/data.db" ] || { echo 'expected restored data.db' >&2; exit 1; }
 [ -f "$RESTORE_DIR/pb_data/storage/images/example.txt" ] || { echo 'expected restored storage file' >&2; exit 1; }
-cmp "$PB_FAKE/data.db" "$RESTORE_DIR/pb_data/data.db"
+restored_integrity=$(sqlite3 "$RESTORE_DIR/pb_data/data.db" 'PRAGMA integrity_check;')
+[ "$restored_integrity" = 'ok' ] || { echo "expected restored SQLite integrity ok, got: $restored_integrity" >&2; exit 1; }
+restored_value=$(sqlite3 "$RESTORE_DIR/pb_data/data.db" "SELECT value FROM smoke WHERE id = 1;")
+[ "$restored_value" = 'fake sqlite row' ] || { echo "expected restored sqlite row, got: $restored_value" >&2; exit 1; }
 cmp "$PB_FAKE/storage/images/example.txt" "$RESTORE_DIR/pb_data/storage/images/example.txt"
 
-if find "$BACKUPS" -maxdepth 1 -type f -name '*.tmp.*' | grep -q .; then
-  echo 'expected no temporary archive/checksum files after successful backup' >&2
+if find "$BACKUPS" -maxdepth 1 \( -type f -o -type d \) -name '*.tmp.*' | grep -q .; then
+  echo 'expected no temporary archive/checksum/staging files after successful backup' >&2
+  exit 1
+fi
+if find "$BACKUPS" -maxdepth 1 -type d -name '.pocketbase-backup-staging.*' | grep -q .; then
+  echo 'expected no temporary staging directories after successful backup' >&2
   exit 1
 fi
 

@@ -34,11 +34,23 @@ if [ -n "$RETENTION_DAYS" ] && [ "$ENABLE_PRUNE" != "1" ]; then
 fi
 
 mkdir -p "$BACKUP_DIR"
+pb_data_resolved=$(cd "$PB_DATA_DIR" && pwd -P)
+backup_dir_resolved=$(cd "$BACKUP_DIR" && pwd -P)
+
+case "$pb_data_resolved/" in
+  "$backup_dir_resolved"/*) fail "PB_DATA_DIR must not be inside BACKUP_DIR: $pb_data_resolved" ;;
+esac
+
+case "$backup_dir_resolved/" in
+  "$pb_data_resolved"/*) fail "BACKUP_DIR must not be inside PB_DATA_DIR: $backup_dir_resolved" ;;
+esac
+
 lock_dir="$BACKUP_DIR/.pocketbase-backup.lock"
 if ! mkdir "$lock_dir" 2>/dev/null; then
   fail "another backup appears to be running (lock exists: $lock_dir)"
 fi
 cleanup() {
+  rm -f "${archive_tmp:-}" "${checksum_tmp:-}"
   rm -rf "$lock_dir"
 }
 trap cleanup EXIT INT TERM
@@ -48,24 +60,27 @@ source_parent=$(cd "$(dirname "$PB_DATA_DIR")" && pwd -P)
 source_base=$(basename "$PB_DATA_DIR")
 archive="$BACKUP_DIR/pocketbase-${timestamp}.tar.gz"
 checksum="$archive.sha256"
+archive_tmp="$archive.tmp.$$"
+checksum_tmp="$checksum.tmp.$$"
 
 log "source=$PB_DATA_DIR"
 log "destination=$archive"
 
-tar -czf "$archive" -C "$source_parent" "$source_base"
-[ -s "$archive" ] || fail "archive was not created or is empty: $archive"
+tar -czf "$archive_tmp" -C "$source_parent" "$source_base"
+[ -s "$archive_tmp" ] || fail "archive was not created or is empty: $archive_tmp"
+tar -tzf "$archive_tmp" >/dev/null
+mv "$archive_tmp" "$archive"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$archive" > "$checksum"
-  sha256sum -c "$checksum" >/dev/null
+  sha256sum "$archive" > "$checksum_tmp"
+  sha256sum -c "$checksum_tmp" >/dev/null
 elif command -v shasum >/dev/null 2>&1; then
-  shasum -a 256 "$archive" > "$checksum"
-  shasum -a 256 -c "$checksum" >/dev/null
+  shasum -a 256 "$archive" > "$checksum_tmp"
+  shasum -a 256 -c "$checksum_tmp" >/dev/null
 else
   fail 'neither sha256sum nor shasum is available for checksum verification'
 fi
-
-tar -tzf "$archive" >/dev/null
+mv "$checksum_tmp" "$checksum"
 
 if [ -n "$REMOTE_TARGET" ]; then
   command -v rsync >/dev/null 2>&1 || fail 'REMOTE_TARGET requested but rsync is not available'

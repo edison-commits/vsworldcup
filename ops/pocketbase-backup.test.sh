@@ -65,6 +65,18 @@ if PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$BACKUPS" REMOTE_TARGET='example.invalid:/
 fi
 grep -q 'REMOTE_TARGET is set but ENABLE_REMOTE_COPY=1 was not provided' /tmp/pocketbase-backup-remote.err
 
+PRUNE_GUARD_BACKUPS="$TMP_DIR/prune-guard-backups"
+mkdir -p "$PRUNE_GUARD_BACKUPS"
+old_archive="$PRUNE_GUARD_BACKUPS/pocketbase-old.tar.gz"
+printf 'old backup placeholder\n' > "$old_archive"
+if ! PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$PRUNE_GUARD_BACKUPS" RETENTION_DAYS=1 bash "$SCRIPT" >/tmp/pocketbase-backup-prune-guard.out 2>/tmp/pocketbase-backup-prune-guard.err; then
+  echo 'expected RETENTION_DAYS without ENABLE_PRUNE=1 to run without pruning' >&2
+  cat /tmp/pocketbase-backup-prune-guard.err >&2
+  exit 1
+fi
+grep -q 'RETENTION_DAYS=1 ignored because ENABLE_PRUNE is not 1' /tmp/pocketbase-backup-prune-guard.out
+[ -f "$old_archive" ] || { echo 'expected old backup placeholder to remain when pruning is not enabled' >&2; exit 1; }
+
 if PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$PB_FAKE/generated-backups" bash "$SCRIPT" >/tmp/pocketbase-backup-nested.out 2>/tmp/pocketbase-backup-nested.err; then
   echo 'expected BACKUP_DIR nested inside PB_DATA_DIR to fail' >&2
   exit 1

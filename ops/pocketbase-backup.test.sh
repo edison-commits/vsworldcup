@@ -80,4 +80,12 @@ if PB_DATA_DIR="$PARENT_BACKUPS/pb_data_inside" BACKUP_DIR="$PARENT_BACKUPS" bas
 fi
 grep -q 'PB_DATA_DIR must not be inside BACKUP_DIR' /tmp/pocketbase-backup-source-inside.err
 
+LOCKED_BACKUPS="$TMP_DIR/locked-backups"
+mkdir -p "$LOCKED_BACKUPS/.pocketbase-backup.lock"
+if PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$LOCKED_BACKUPS" bash "$SCRIPT" >/tmp/pocketbase-backup-locked.out 2>/tmp/pocketbase-backup-locked.err; then
+  echo 'expected existing lock directory to fail' >&2
+  exit 1
+fi
+grep -q 'another backup appears to be running' /tmp/pocketbase-backup-locked.err
+
 echo 'pocketbase-backup.test.sh: OK'

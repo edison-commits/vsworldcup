@@ -245,6 +245,32 @@ function inferCountryCode(record = {}) {
   return timezoneHints.find(([pattern]) => pattern.test(timezone))?.[1] || '';
 }
 
+const REGION_BY_COUNTRY = {
+  US: 'North America', CA: 'North America', MX: 'North America',
+  BR: 'South America', AR: 'South America', CL: 'South America', CO: 'South America', PE: 'South America',
+  GB: 'Europe', FR: 'Europe', DE: 'Europe', ES: 'Europe', IT: 'Europe', NL: 'Europe', SE: 'Europe', NO: 'Europe', DK: 'Europe', IE: 'Europe',
+  JP: 'Asia', KR: 'Asia', CN: 'Asia', IN: 'Asia', ID: 'Asia', PH: 'Asia', VN: 'Asia', TH: 'Asia', SG: 'Asia', MY: 'Asia',
+  AU: 'Oceania', NZ: 'Oceania',
+  ZA: 'Africa', NG: 'Africa', KE: 'Africa', EG: 'Africa', MA: 'Africa'
+};
+
+function regionFromCountryCode(code) {
+  const normalized = normalizeCountryCode(code);
+  return normalized ? (REGION_BY_COUNTRY[normalized] || 'Other') : 'Unknown';
+}
+
+function summarizeChampionCounts(records = []) {
+  const counts = new Map();
+  for (const record of records || []) {
+    const champion = String(record?.champion_name || '').trim();
+    if (!champion) continue;
+    counts.set(champion, (counts.get(champion) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, count]) => ({ name, count }));
+}
+
 function buildCountryWinnerStats(records = []) {
   const byCountry = new Map();
   for (const record of records || []) {
@@ -270,6 +296,7 @@ function buildCountryWinnerStats(records = []) {
     return {
       country_code: bucket.country_code,
       country: bucket.country,
+      region: regionFromCountryCode(bucket.country_code),
       flag: bucket.flag,
       top_item,
       wins,
@@ -308,13 +335,47 @@ async function fetchPocketBasePlaySessions(tournamentId, maxRecords = 1000) {
   return records;
 }
 
+function buildRegionalWinnerStats(records = []) {
+  const byRegion = new Map();
+  for (const record of records || []) {
+    const champion = String(record?.champion_name || '').trim();
+    if (!champion) continue;
+    const countryCode = inferCountryCode(record) || 'XX';
+    const region = regionFromCountryCode(countryCode);
+    if (!byRegion.has(region)) byRegion.set(region, { region, total_sessions: 0, champions: new Map(), countries: new Set() });
+    const bucket = byRegion.get(region);
+    bucket.total_sessions += 1;
+    bucket.countries.add(countryCode);
+    bucket.champions.set(champion, (bucket.champions.get(champion) || 0) + 1);
+  }
+  return [...byRegion.values()].map((bucket) => {
+    const championCounts = [...bucket.champions.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const [top_item, wins] = championCounts[0] || ['Unknown', 0];
+    return {
+      region: bucket.region,
+      top_item,
+      wins,
+      total_sessions: bucket.total_sessions,
+      country_count: [...bucket.countries].filter((code) => code !== 'XX').length,
+      share: bucket.total_sessions ? Math.round((wins / bucket.total_sessions) * 100) : 0,
+      contenders: championCounts.slice(0, 5).map(([name, count]) => ({ name, count }))
+    };
+  }).sort((a, b) => b.total_sessions - a.total_sessions || a.region.localeCompare(b.region));
+}
+
 app.get('/api/stats/tournaments/:tournamentId/country-winners', async (req, res) => {
   try {
     const { tournamentId } = req.params;
     if (!tournamentId || tournamentId.length > 100) return res.status(400).json({ error: 'Invalid tournamentId' });
     const limit = Math.min(Math.max(Number(req.query.limit) || 1000, 1), 2000);
     const records = await fetchPocketBasePlaySessions(tournamentId, limit);
-    res.json({ tournament_id: tournamentId, countries: buildCountryWinnerStats(records), sample_size: records.length });
+    res.json({
+      tournament_id: tournamentId,
+      countries: buildCountryWinnerStats(records),
+      regions: buildRegionalWinnerStats(records),
+      global_top_items: summarizeChampionCounts(records).slice(0, 10),
+      sample_size: records.length
+    });
   } catch (err) {
     console.error('Country winners stats error:', err.message, err.detail || '');
     res.status(502).json({ error: 'Failed to build country winner stats' });
@@ -426,5 +487,8 @@ module.exports = {
   buildAnthropicGenerateRequest,
   normalizeCountryCode,
   inferCountryCode,
-  buildCountryWinnerStats
+  regionFromCountryCode,
+  summarizeChampionCounts,
+  buildCountryWinnerStats,
+  buildRegionalWinnerStats
 };

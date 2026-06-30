@@ -8,7 +8,9 @@ const {
   normalizeGenerateCount,
   buildGeneratePrompt,
   inferCountryCode,
-  buildCountryWinnerStats
+  buildCountryWinnerStats,
+  buildRegionalWinnerStats,
+  summarizeChampionCounts
 } = require('./proxy');
 
 test('extractBalancedJsonObject ignores prose and braces inside strings', () => {
@@ -243,10 +245,33 @@ test('buildCountryWinnerStats returns the #1 champion per country', () => {
   const us = stats.find((country) => country.country_code === 'US');
   const kr = stats.find((country) => country.country_code === 'KR');
   assert.equal(us.top_item, 'Pizza');
+  assert.equal(us.region, 'North America');
   assert.equal(us.wins, 2);
   assert.equal(us.total_sessions, 3);
   assert.equal(us.share, 67);
   assert.equal(kr.top_item, 'Ramen');
+});
+
+test('buildRegionalWinnerStats and summarizeChampionCounts rank regions and global favorites', () => {
+  const records = [
+    { locale: 'en-US', champion_name: 'Pizza' },
+    { locale: 'en-US', champion_name: 'Tacos' },
+    { locale: 'en-CA', champion_name: 'Pizza' },
+    { locale: 'ko-KR', champion_name: 'Ramen' },
+    { locale: 'ja-JP', champion_name: 'Sushi' },
+    { locale: 'ja-JP', champion_name: 'Sushi' }
+  ];
+  const regions = buildRegionalWinnerStats(records);
+  const northAmerica = regions.find((region) => region.region === 'North America');
+  const asia = regions.find((region) => region.region === 'Asia');
+  assert.equal(northAmerica.top_item, 'Pizza');
+  assert.equal(northAmerica.country_count, 2);
+  assert.equal(northAmerica.share, 67);
+  assert.equal(asia.top_item, 'Sushi');
+  assert.deepEqual(summarizeChampionCounts(records).slice(0, 2), [
+    { name: 'Pizza', count: 2 },
+    { name: 'Sushi', count: 2 }
+  ]);
 });
 
 test('country winners route reads play sessions and returns country stats', async () => {
@@ -282,6 +307,12 @@ test('country winners route reads play sessions and returns country stats', asyn
     assert.equal(body.countries[0].country_code, 'US');
     assert.equal(body.countries[0].top_item, 'Pizza');
     assert.equal(body.countries[0].share, 67);
+    assert.equal(body.regions[0].region, 'North America');
+    assert.equal(body.regions[0].top_item, 'Pizza');
+    assert.deepEqual(body.global_top_items.slice(0, 2), [
+      { name: 'Pizza', count: 2 },
+      { name: 'Ramen', count: 1 }
+    ]);
     assert.equal(calls.length, 1);
     assert.match(String(calls[0].url), /play_sessions\/records\?/);
     assert.match(String(calls[0].url), /perPage=50/);

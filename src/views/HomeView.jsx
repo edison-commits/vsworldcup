@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import SafeImage from "../components/SafeImage";
 import { dedupeTournamentsForDisplay, getDiscoveryRows, getTournamentStats } from "../lib/homeFilters";
 import { buildVotingProfile } from "../lib/votingProfile";
+import { buildSponsorMailto, buildSponsorSlot } from "../lib/revenueExperiments";
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -187,6 +188,20 @@ function RecentlyPlayed({ recentPlays, tournaments, onSelect, lang, T }) {
   );
 }
 
+function SponsorExperimentCard({ slot }) {
+  if (!slot?.enabled) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 28, padding: "16px 18px", borderRadius: 18, background: "linear-gradient(135deg,rgba(255,51,102,0.12),rgba(0,229,255,0.08))", border: "1px solid var(--border)" }}>
+      <div>
+        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, fontWeight: 900, color: "var(--text)", marginBottom: 4 }}>💼 {slot.title}</div>
+        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", maxWidth: 520 }}>{slot.subtitle}</div>
+        <div style={{ fontFamily: "Space Mono,monospace", fontSize: 10, color: "var(--textDim)", marginTop: 6 }}>{slot.disclaimer}</div>
+      </div>
+      <a href={buildSponsorMailto({ title: slot.title, source: slot.source })} style={{ textDecoration: "none", color: "#fff", background: "var(--accent)", borderRadius: 999, padding: "10px 14px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 800 }}>{slot.cta}</a>
+    </div>
+  );
+}
+
 function VotingProfileCard({ recentPlays }) {
   const profile = buildVotingProfile(recentPlays);
   if (!profile.totalPlays) return null;
@@ -333,6 +348,7 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
   const displayTournaments = useMemo(() => dedupeTournamentsForDisplay(tournaments), [tournaments]);
   const discoveryRows = useMemo(() => getDiscoveryRows(tournaments), [tournaments]);
   const stats = useMemo(() => getTournamentStats(tournaments, CATEGORIES), [tournaments, CATEGORIES]);
+  const sponsorSlot = useMemo(() => buildSponsorSlot({ tournamentsCount: stats.total, playsLogged: stats.plays }), [stats.total, stats.plays]);
   const catFiltered = fc === "all" ? displayTournaments : displayTournaments.filter((tr) => tr.category === fc);
   const searchFiltered = search.trim()
     ? catFiltered.filter((tr) => tr.title.toLowerCase().includes(search.toLowerCase().trim()))
@@ -371,6 +387,7 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
       <DailyChallengeBanner tournament={dailyChallenge} onPlay={onDailyChallenge} lang={lang} T={T} />
       <ResumeBanner resumeGame={resumeGame} onResumeGame={onResumeGame} lang={lang} T={T} />
       <VotingProfileCard recentPlays={recentPlays} />
+      <SponsorExperimentCard slot={sponsorSlot} />
       <RecentlyPlayed recentPlays={recentPlays} tournaments={tournaments} onSelect={onSelect} lang={lang} T={T} />
       {!isLoading && !search && fc === "all" && <DiscoveryShelves rows={discoveryRows} onSelect={onSelect} />}
 

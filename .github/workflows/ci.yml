@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches-ignore: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependency surface
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Frontend tests
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Server tests
+        run: node --test server/proxy.test.js
+
+      - name: Python ops tests
+        run: python3 -m unittest ops/auto_tournament_test.py
+
+      - name: Ops script syntax and backup helper
+        run: |
+          python3 -m py_compile ops/auto-tournament.py
+          bash -n ops/vsworldcup-healthcheck.sh
+          bash -n ops/pocketbase-backup.sh
+          bash -n ops/pocketbase-backup.test.sh
+          bash ops/pocketbase-backup.test.sh

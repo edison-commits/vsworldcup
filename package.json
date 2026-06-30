@@ -19,6 +19,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run --environment jsdom"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "browserslist": {
     "production": [
       ">0.2%",

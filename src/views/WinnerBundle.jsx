@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import SafeImage from "../components/SafeImage";
+import { buildResultShareKit, getShareUrlForPlatform } from "../lib/socialShare";
 
 const REACTION_EMOJIS = [
   { id: "fire", emoji: "🔥", label: "Great pick" },
@@ -51,11 +52,9 @@ function ShareCard({ tournament, winner, history, lang, T }) {
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
   const shareUrl = typeof window !== "undefined" ? window.location.href : "https://vsworldcup.com";
-  const shareText = `${winner.name} won ${tournament.title} on VS WORLDCUP`;
-  const fullText = `${shareText}${winner.tagline ? ` — ${winner.tagline}` : ""}`;
-  const encodedText = encodeURIComponent(shareText);
-  const encodedUrl = encodeURIComponent(shareUrl);
-  const encodedFull = encodeURIComponent(fullText);
+  const kit = buildResultShareKit({ tournament, winner, url: shareUrl });
+  const shareText = kit.captions[0];
+  const fullText = getShareUrlForPlatform("clipboard", kit);
   const hasNativeShare = typeof navigator !== "undefined" && !!navigator.share;
 
   const nativeShare = async () => {
@@ -67,18 +66,18 @@ function ShareCard({ tournament, winner, history, lang, T }) {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard?.writeText(`${fullText}\n${shareUrl}`).then(() => {
+    navigator.clipboard?.writeText(fullText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
   };
 
   const platforms = [
-    { id: "twitter", emoji: "𝕏", label: "Twitter/X", url: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}` },
-    { id: "facebook", emoji: "f", label: "Facebook", url: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}` },
-    { id: "whatsapp", emoji: "💬", label: "WhatsApp", url: `https://wa.me/?text=${encodedFull}%20${encodedUrl}` },
-    { id: "telegram", emoji: "✈️", label: "Telegram", url: `https://t.me/share/url?url=${encodedUrl}&text=${encodedFull}` },
-    { id: "reddit", emoji: "🔗", label: "Reddit", url: `https://reddit.com/submit?url=${encodedUrl}&title=${encodedText}` },
+    { id: "x", emoji: "𝕏", label: "Twitter/X", url: getShareUrlForPlatform("x", kit) },
+    { id: "facebook", emoji: "f", label: "Facebook", url: getShareUrlForPlatform("facebook", kit) },
+    { id: "whatsapp", emoji: "💬", label: "WhatsApp", url: getShareUrlForPlatform("whatsapp", kit) },
+    { id: "telegram", emoji: "✈️", label: "Telegram", url: getShareUrlForPlatform("telegram", kit) },
+    { id: "reddit", emoji: "🔗", label: "Reddit", url: getShareUrlForPlatform("reddit", kit) },
   ];
 
   return (
@@ -91,6 +90,13 @@ function ShareCard({ tournament, winner, history, lang, T }) {
         <div style={{ fontSize: 24, fontFamily: "Outfit,sans-serif", fontWeight: 900, background: "linear-gradient(135deg,#ffd700,#ffaa00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 8 }}>{winner.name}</div>
         {winner.tagline && <div style={{ fontSize: 13, fontStyle: "italic", color: "#00e5ff", marginBottom: 12 }}>{winner.tagline}</div>}
         {history.length > 0 && <div style={{ fontSize: 11, color: "#666", fontFamily: "Space Mono,monospace" }}>{history.length} matches · {(history.reduce((a, h) => a + h.time, 0) / history.length).toFixed(1)}{t.sec} {t.avgTime}</div>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+        {kit.captions.map((caption, idx) => (
+          <button key={caption} onClick={() => navigator.clipboard?.writeText(`${caption}\n${shareUrl}`)} style={{ textAlign: "left", padding: "9px 11px", borderRadius: 10, background: "var(--surfaceLight)", border: "1px solid var(--border)", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 12, cursor: "pointer" }}>
+            <span style={{ color: "var(--accentAlt)", fontFamily: "Space Mono,monospace", marginRight: 6 }}>Caption {idx + 1}</span>{caption}
+          </button>
+        ))}
       </div>
       {hasNativeShare ? (
         <button onClick={nativeShare} style={{ width: "100%", padding: "13px 20px", borderRadius: 12, background: shared ? "var(--success)" : "linear-gradient(135deg,var(--accent),#ff6699)", color: "#fff", border: "none", fontFamily: "Outfit,sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 12 }}>{shared ? `✓ ${t.shareNow || "Shared!"}` : `📤 ${t.shareResult || "Share Result"}`}</button>

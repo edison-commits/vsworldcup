@@ -33,7 +33,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vsworldcup-dist
-          path: build/
+          path: |
+            build/
+            server.js
 
   deploy:
     needs: build
@@ -54,6 +56,7 @@ jobs:
           command_timeout: 10m
           script: |
             rsync -az --delete /tmp/dist/build/ /opt/vsworldcup/vs-worldcup/build/
+            rsync -az /tmp/dist/server.js /opt/vsworldcup/vs-worldcup/server.js
             systemctl restart vsworldcup
             sleep 3
             systemctl is-active vsworldcup

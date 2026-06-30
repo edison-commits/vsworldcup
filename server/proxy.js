@@ -448,7 +448,7 @@ app.get('/api/stats/auto-tournaments', async (req, res) => {
     const params = new URLSearchParams({
       page: '1',
       perPage: String(Math.min(Math.max(Number(req.query.limit) || 20, 1), 50)),
-      sort: '-created',
+      sort: '-tournament_id',
       filter: 'author="AI Generated"'
     });
     const pbRes = await fetch(`http://localhost:8090/api/collections/tournaments/records?${params}`);

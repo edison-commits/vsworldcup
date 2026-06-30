@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const childProcess = require('child_process');
 const app = express();
 
 app.use(cors({ origin: ['https://vsworldcup.com', 'https://www.vsworldcup.com'] }));
@@ -335,6 +336,40 @@ async function fetchPocketBasePlaySessions(tournamentId, maxRecords = 1000) {
   return records;
 }
 
+function fetchSqlitePlaySessions(tournamentId, maxRecords = 1000) {
+  const dbPath = process.env.PB_SQLITE_PATH || '/opt/pocketbase/pb_data/data.db';
+  const script = `
+import json, sqlite3, sys
+path, tournament_id, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
+con = sqlite3.connect(path)
+con.row_factory = sqlite3.Row
+rows = con.execute('''
+  SELECT champion_name, locale, screen_size, user_agent
+  FROM play_sessions
+  WHERE tournament_id = ? AND champion_name <> ''
+  ORDER BY rowid DESC
+  LIMIT ?
+''', (tournament_id, limit)).fetchall()
+print(json.dumps([dict(row) for row in rows]))
+`;
+  const out = childProcess.execFileSync('python3', ['-c', script, dbPath, String(tournamentId), String(maxRecords)], {
+    encoding: 'utf8',
+    timeout: 5000,
+    maxBuffer: 1024 * 1024
+  });
+  return JSON.parse(out);
+}
+
+async function fetchPlaySessionsForStats(tournamentId, maxRecords = 1000) {
+  try {
+    return await fetchPocketBasePlaySessions(tournamentId, maxRecords);
+  } catch (err) {
+    if (err.status !== 403) throw err;
+    console.warn('PocketBase API stats read failed, falling back to sqlite:', err.message);
+    return fetchSqlitePlaySessions(tournamentId, maxRecords);
+  }
+}
+
 function buildRegionalWinnerStats(records = []) {
   const byRegion = new Map();
   for (const record of records || []) {
@@ -368,7 +403,7 @@ app.get('/api/stats/tournaments/:tournamentId/country-winners', async (req, res)
     const { tournamentId } = req.params;
     if (!tournamentId || tournamentId.length > 100) return res.status(400).json({ error: 'Invalid tournamentId' });
     const limit = Math.min(Math.max(Number(req.query.limit) || 1000, 1), 2000);
-    const records = await fetchPocketBasePlaySessions(tournamentId, limit);
+    const records = await fetchPlaySessionsForStats(tournamentId, limit);
     res.json({
       tournament_id: tournamentId,
       countries: buildCountryWinnerStats(records),
@@ -489,6 +524,7 @@ module.exports = {
   inferCountryCode,
   regionFromCountryCode,
   summarizeChampionCounts,
+  fetchSqlitePlaySessions,
   buildCountryWinnerStats,
   buildRegionalWinnerStats
 };

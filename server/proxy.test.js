@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const childProcess = require('node:child_process');
 const {
   app,
   extractBalancedJsonObject,
@@ -326,5 +327,39 @@ test('country winners route reads play sessions and returns country stats', asyn
     } else {
       process.env.PB_ADMIN_TOKEN = previousToken;
     }
+  }
+});
+
+
+test('country winners route falls back to sqlite when PocketBase forbids stats reads', async () => {
+  const previousFetch = global.fetch;
+  const previousExec = childProcess.execFileSync;
+  global.fetch = async () => new Response(JSON.stringify({ message: 'Only superusers can perform this action.' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' }
+  });
+  childProcess.execFileSync = (bin, args) => {
+    assert.equal(bin, 'python3');
+    assert.equal(args[3], 'tour123');
+    return JSON.stringify([
+      { locale: 'en-US', champion_name: 'Pizza' },
+      { locale: 'en-CA', champion_name: 'Pizza' },
+      { locale: 'ja-JP', champion_name: 'Sushi' }
+    ]);
+  };
+
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/api/stats/tournaments/tour123/country-winners?limit=50`);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.sample_size, 3);
+    assert.equal(body.regions[0].region, 'North America');
+    assert.equal(body.global_top_items[0].name, 'Pizza');
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    global.fetch = previousFetch;
+    childProcess.execFileSync = previousExec;
   }
 });

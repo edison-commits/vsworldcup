@@ -28,6 +28,8 @@ function CountryWinnersMap({ tournament }) {
   }, [tournament?.id]);
 
   const countries = stats?.countries || [];
+  const regions = stats?.regions || [];
+  const globalTopItems = stats?.global_top_items || [];
   const topCountries = countries.slice(0, 12);
 
   return (
@@ -69,6 +71,25 @@ function CountryWinnersMap({ tournament }) {
                 <div style={{ fontFamily: "Space Mono,monospace", fontSize: 12, color: "var(--success)", fontWeight: 800 }}>{country.share}%</div>
                 <div style={{ fontFamily: "Space Mono,monospace", fontSize: 10, color: "var(--textDim)" }}>{country.wins}/{country.total_sessions}</div>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(regions.length > 0 || globalTopItems.length > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 10, marginTop: 14 }}>
+          {regions.slice(0, 4).map((region) => (
+            <div key={`region-${region.region}`} style={{ padding: "12px 14px", borderRadius: 14, background: "rgba(255,255,255,0.035)", border: "1px solid var(--border)" }}>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 900, color: "var(--textDim)", textTransform: "uppercase", letterSpacing: 1 }}>{region.region}</div>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 16, fontWeight: 900, color: "var(--text)", marginTop: 4 }}>{region.top_item}</div>
+              <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: "var(--accentAlt)", marginTop: 5 }}>{region.share}% · {region.total_sessions} results · {region.country_count} countries</div>
+            </div>
+          ))}
+          {globalTopItems.slice(0, 3).map((item, idx) => (
+            <div key={`global-${item.name}`} style={{ padding: "12px 14px", borderRadius: 14, background: "rgba(255,215,0,0.055)", border: "1px solid rgba(255,215,0,0.16)" }}>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 900, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1 }}>Global #{idx + 1}</div>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 16, fontWeight: 900, color: "var(--text)", marginTop: 4 }}>{item.name}</div>
+              <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: "var(--textDim)", marginTop: 5 }}>{item.count} wins across countries</div>
             </div>
           ))}
         </div>

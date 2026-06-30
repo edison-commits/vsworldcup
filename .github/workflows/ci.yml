@@ -31,7 +31,7 @@ jobs:
         run: npm run build
 
       - name: Server tests
-        run: node --test server/proxy.test.js
+        run: node --test server.test.js server/proxy.test.js
 
       - name: Python ops tests
         run: python3 -m unittest ops/auto_tournament_test.py

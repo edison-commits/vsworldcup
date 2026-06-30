@@ -1,4 +1,4 @@
-import { dedupeTournamentsForDisplay, getTournamentStats, normalizeTitleForDisplay } from './homeFilters';
+import { dedupeTournamentsForDisplay, getDiscoveryRows, getTournamentStats, normalizeTitleForDisplay } from './homeFilters';
 
 test('normalizes duplicate tournament titles for display', () => {
   expect(normalizeTitleForDisplay('Best Studio Ghibli Films!')).toBe('best studio ghibli films');
@@ -24,4 +24,19 @@ test('summarizes display stats after dedupe', () => {
   const categories = [{ id: 'food' }, { id: 'travel' }, { id: 'custom' }];
 
   expect(getTournamentStats(tournaments, categories)).toEqual({ total: 2, categories: 2, plays: 8 });
+});
+
+test('builds discovery rows for trending, fresh, and quick-play tournaments', () => {
+  const now = Date.now();
+  const tournaments = [
+    { id: String(now), title: 'Fresh Favorite', category: 'food', plays: 9, items: Array.from({ length: 16 }) },
+    { id: 'old-popular', title: 'Old Popular', category: 'music', plays: 1200, items: Array.from({ length: 32 }) },
+    { id: 'quick-8', title: 'Quick Eight', category: 'games', plays: 30, items: Array.from({ length: 8 }) },
+    { id: 'tiny-4', title: 'Tiny Four', category: 'games', plays: 10, items: Array.from({ length: 4 }) },
+  ];
+
+  const rows = getDiscoveryRows(tournaments, { now });
+  expect(rows.trending.map((t) => t.id)).toEqual(['old-popular', 'quick-8', 'tiny-4', String(now)]);
+  expect(rows.fresh.map((t) => t.id)).toEqual([String(now)]);
+  expect(rows.quick.map((t) => t.id)).toEqual(['tiny-4', 'quick-8']);
 });

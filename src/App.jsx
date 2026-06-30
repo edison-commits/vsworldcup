@@ -1385,7 +1385,7 @@ export default function App() {
     setResumeGame(null);
     saveLastResult({ tournamentId: selectedTournament?.id, winner: w.name, finishedAt: Date.now() });
     // Save to recently played (localStorage)
-    try{const rp={id:selectedTournament?.id,title:selectedTournament?.title||"Unknown",champion:w.name,timestamp:Date.now()};
+    try{const rp={id:selectedTournament?.id,title:selectedTournament?.title||"Unknown",champion:w.name,category:selectedTournament?.category||"custom",timestamp:Date.now()};
       addRecentPlay(rp);
     }catch(e){}
     // Save play session + match results to PocketBase (single batched call)

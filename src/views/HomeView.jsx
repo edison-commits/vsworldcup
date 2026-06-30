@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import SafeImage from "../components/SafeImage";
 import { dedupeTournamentsForDisplay, getDiscoveryRows, getTournamentStats } from "../lib/homeFilters";
+import { buildVotingProfile } from "../lib/votingProfile";
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -186,6 +187,29 @@ function RecentlyPlayed({ recentPlays, tournaments, onSelect, lang, T }) {
   );
 }
 
+function VotingProfileCard({ recentPlays }) {
+  const profile = buildVotingProfile(recentPlays);
+  if (!profile.totalPlays) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginBottom: 28, padding: 14, borderRadius: 18, border: "1px solid var(--border)", background: "rgba(255,255,255,0.035)" }}>
+      {[
+        ["🧾", profile.streakLabel, "Voting history"],
+        ["🏆", profile.topChampion, "Top champion"],
+        ["🎯", profile.favoriteCategory, "Favorite category"],
+        ["⏱️", profile.lastPlayed?.title || "none yet", "Last bracket"],
+      ].map(([emoji, value, label]) => (
+        <div key={label} style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
+          <div style={{ fontSize: 22 }}>{emoji}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 800, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
+            <div style={{ fontFamily: "Space Mono,monospace", fontSize: 10, color: "var(--textDim)", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DiscoveryShelves({ rows, onSelect }) {
   const shelves = [
     { key: "trending", title: "Trending now", subtitle: "Most-played brackets people keep coming back to", emoji: "🔥" },
@@ -346,6 +370,7 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
 
       <DailyChallengeBanner tournament={dailyChallenge} onPlay={onDailyChallenge} lang={lang} T={T} />
       <ResumeBanner resumeGame={resumeGame} onResumeGame={onResumeGame} lang={lang} T={T} />
+      <VotingProfileCard recentPlays={recentPlays} />
       <RecentlyPlayed recentPlays={recentPlays} tournaments={tournaments} onSelect={onSelect} lang={lang} T={T} />
       {!isLoading && !search && fc === "all" && <DiscoveryShelves rows={discoveryRows} onSelect={onSelect} />}
 

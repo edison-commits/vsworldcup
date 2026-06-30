@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { analyzeTournamentDraft, buildEntryTextImportRows } from "../lib/creatorTools";
 
 export default function CreateView({
   onCreated,
@@ -20,6 +21,16 @@ export default function CreateView({
     { id: Date.now() + 3, name: "", img: "" },
   ]);
   const [error, setError] = useState("");
+  const [bulkText, setBulkText] = useState("");
+
+  const draftAudit = analyzeTournamentDraft({ title, items, isValidUrl });
+  const applyBulkImport = () => {
+    const rows = buildEntryTextImportRows(bulkText);
+    if (!rows.length) return;
+    setItems(rows.map((row) => ({ id: Date.now() + Math.random(), ...row })));
+    setBulkText("");
+    setError("");
+  };
 
   const addItem = () => setItems([...items, { id: Date.now() + Math.random(), name: "", img: "" }]);
   const removeItem = (id) => {
@@ -112,6 +123,26 @@ export default function CreateView({
         {CATEGORIES.map((cat) => <button key={cat.id} onClick={() => setCategory(cat.id)} style={{ background: category === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: category === cat.id ? "#fff" : "var(--textDim)", border: `1px solid ${category === cat.id ? "var(--accent)" : "var(--border)"}`, borderRadius: 20, padding: "7px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>)}
       </div>
       <label style={{ fontFamily: "Outfit,sans-serif", fontSize: 14, fontWeight: 600, color: "var(--textDim)", display: "block", marginBottom: 10 }}>{t.entriesLabel} ({items.length})</label>
+      <div style={{ marginBottom: 14, padding: 14, borderRadius: 14, background: "rgba(255,255,255,0.035)", border: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 800, color: "var(--text)", textTransform: "uppercase", letterSpacing: 1.4 }}>Creator QA</div>
+            <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, color: "var(--textDim)", marginTop: 2 }}>Paste a list, catch duplicates, and verify bracket readiness before publishing.</div>
+          </div>
+          <div style={{ fontFamily: "Space Mono,monospace", fontSize: 12, color: draftAudit.ready ? "var(--success)" : "var(--accentAlt)", border: "1px solid var(--border)", borderRadius: 999, padding: "6px 10px" }}>{draftAudit.ready ? "READY" : "NEEDS REVIEW"}</div>
+        </div>
+        <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Paste one entry per line…" rows={3} style={{ width: "100%", boxSizing: "border-box", resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontFamily: "Outfit,sans-serif", fontSize: 13, outline: "none", marginBottom: 8 }} />
+        <button onClick={applyBulkImport} disabled={!buildEntryTextImportRows(bulkText).length} style={{ width: "100%", background: buildEntryTextImportRows(bulkText).length ? "var(--surfaceLight)" : "var(--surface)", color: "var(--accentAlt)", border: "1px dashed var(--border)", borderRadius: 10, padding: "9px 12px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 700, cursor: buildEntryTextImportRows(bulkText).length ? "pointer" : "not-allowed", marginBottom: 10 }}>Import pasted list</button>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 8 }}>
+          {draftAudit.checks.map((check) => (
+            <div key={check.id} style={{ padding: "9px 10px", borderRadius: 10, background: check.status === "error" ? "rgba(255,51,102,0.08)" : check.status === "warning" ? "rgba(255,200,87,0.08)" : "rgba(0,230,118,0.07)", border: `1px solid ${check.status === "error" ? "rgba(255,51,102,0.22)" : check.status === "warning" ? "rgba(255,200,87,0.22)" : "rgba(0,230,118,0.18)"}` }}>
+              <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: check.status === "error" ? "var(--accent)" : check.status === "warning" ? "var(--accentAlt)" : "var(--success)", marginBottom: 3 }}>{check.status.toUpperCase()}</div>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{check.label}</div>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, color: "var(--textDim)", marginTop: 2 }}>{check.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "8px 14px", borderRadius: 10, background: isPower ? "rgba(0,230,118,0.08)" : "rgba(255,51,102,0.06)", border: `1px solid ${isPower ? "rgba(0,230,118,0.2)" : "rgba(255,51,102,0.15)"}`, flexWrap: "wrap" }}>
         <span style={{ fontFamily: "Space Mono,monospace", fontSize: 13, color: isPower ? "var(--success)" : "var(--accent)" }}>{validCount} named</span>
         {!isPower && validCount >= 2 && <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, color: "var(--textDim)" }}>→ need {targets.filter((n) => n >= 4).join(", ")}</span>}

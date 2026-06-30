@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { vi } from "vitest";
 import App from "./App";
 import { getDailyChallengeIndex, normalizeTournamentRecords } from "./lib/tournaments";
 
 beforeEach(() => {
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ items: [] }),
@@ -12,15 +13,15 @@ beforeEach(() => {
 
   Object.defineProperty(window, "matchMedia", {
     writable: true,
-    value: jest.fn().mockImplementation(() => ({
+    value: vi.fn().mockImplementation(() => ({
       matches: false,
       media: "",
       onchange: null,
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
     })),
   });
 
@@ -29,11 +30,16 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.resetAllMocks();
+  vi.resetAllMocks();
 });
 
 test("renders VS WORLDCUP home screen", async () => {
   render(<App />);
+
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
   expect(screen.getByText(/Pick Your/i)).toBeInTheDocument();
   expect(screen.getByText(/Create Tournament/i)).toBeInTheDocument();
 });

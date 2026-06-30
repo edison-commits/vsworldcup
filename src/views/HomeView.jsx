@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import SafeImage from "../components/SafeImage";
-import { dedupeTournamentsForDisplay, getTournamentStats } from "../lib/homeFilters";
+import { dedupeTournamentsForDisplay, getDiscoveryRows, getTournamentStats } from "../lib/homeFilters";
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -186,6 +186,41 @@ function RecentlyPlayed({ recentPlays, tournaments, onSelect, lang, T }) {
   );
 }
 
+function DiscoveryShelves({ rows, onSelect }) {
+  const shelves = [
+    { key: "trending", title: "Trending now", subtitle: "Most-played brackets people keep coming back to", emoji: "🔥" },
+    { key: "fresh", title: "Fresh drops", subtitle: "Newer tournaments to try before everyone else", emoji: "✨" },
+    { key: "quick", title: "Quick plays", subtitle: "Short brackets when you only have a minute", emoji: "⚡" },
+  ].filter((shelf) => rows[shelf.key]?.length);
+  if (!shelves.length) return null;
+  return (
+    <div style={{ marginBottom: 30 }}>
+      {shelves.map((shelf) => (
+        <div key={shelf.key} style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 }}>
+            <div>
+              <h3 style={{ fontFamily: "Outfit,sans-serif", fontSize: 18, fontWeight: 900, margin: 0, color: "var(--text)" }}>{shelf.emoji} {shelf.title}</h3>
+              <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, margin: "3px 0 0", color: "var(--textDim)" }}>{shelf.subtitle}</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch" }}>
+            {rows[shelf.key].map((tournament) => (
+              <button
+                key={`${shelf.key}-${tournament.id}`}
+                onClick={() => onSelect(tournament)}
+                style={{ flex: "0 0 230px", textAlign: "left", border: "1px solid var(--border)", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02))", padding: 14, color: "var(--text)", cursor: "pointer" }}
+              >
+                <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 14, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tournament.title}</div>
+                <div style={{ fontFamily: "Space Mono,monospace", fontSize: 12, color: "var(--accent)", marginTop: 8 }}>{formatNumber(tournament.plays || 0)} plays · {(tournament.items || []).length} entries</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---------- Tournament Card with Badges ----------
 const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang, T, CATEGORIES }) {
   const [hover, setHover] = useState(false);
@@ -272,6 +307,7 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
 
   const displayTournaments = useMemo(() => dedupeTournamentsForDisplay(tournaments), [tournaments]);
+  const discoveryRows = useMemo(() => getDiscoveryRows(tournaments), [tournaments]);
   const stats = useMemo(() => getTournamentStats(tournaments, CATEGORIES), [tournaments, CATEGORIES]);
   const catFiltered = fc === "all" ? displayTournaments : displayTournaments.filter((tr) => tr.category === fc);
   const searchFiltered = search.trim()
@@ -311,6 +347,7 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
       <DailyChallengeBanner tournament={dailyChallenge} onPlay={onDailyChallenge} lang={lang} T={T} />
       <ResumeBanner resumeGame={resumeGame} onResumeGame={onResumeGame} lang={lang} T={T} />
       <RecentlyPlayed recentPlays={recentPlays} tournaments={tournaments} onSelect={onSelect} lang={lang} T={T} />
+      {!isLoading && !search && fc === "all" && <DiscoveryShelves rows={discoveryRows} onSelect={onSelect} />}
 
       {/* SEARCH BAR */}
       <div style={{ marginBottom: 20 }}>

@@ -417,6 +417,50 @@ app.get('/api/stats/tournaments/:tournamentId/country-winners', async (req, res)
   }
 });
 
+function buildAutoTournamentDashboard(records = [], now = new Date()) {
+  const items = (records || []).map((record) => ({
+    id: record.tournament_id || record.id,
+    title: record.title || 'Untitled tournament',
+    category: record.category || 'custom',
+    plays: Number(record.plays || 0),
+    featured: Boolean(record.featured),
+    status: record.status || 'unknown',
+    created: record.created || ''
+  }));
+  const todayId = `auto-${now.toISOString().slice(0, 10)}`;
+  const today = items.find((item) => item.id === todayId) || null;
+  const lastCreated = items[0] || null;
+  const activeCount = items.filter((item) => item.status === 'active').length;
+  return {
+    ok: true,
+    today_id: todayId,
+    today_created: Boolean(today),
+    today,
+    last_created: lastCreated,
+    recent: items.slice(0, 10),
+    active_auto_tournaments: activeCount,
+    duplicate_guard: 'tournament_id-per-day plus normalized-title skip in ops/auto-tournament.py'
+  };
+}
+
+app.get('/api/stats/auto-tournaments', async (req, res) => {
+  try {
+    const params = new URLSearchParams({
+      page: '1',
+      perPage: String(Math.min(Math.max(Number(req.query.limit) || 20, 1), 50)),
+      sort: '-created',
+      filter: 'author="AI Generated"'
+    });
+    const pbRes = await fetch(`http://localhost:8090/api/collections/tournaments/records?${params}`);
+    if (!pbRes.ok) return res.status(pbRes.status).json({ error: 'Failed to read auto tournaments' });
+    const data = await pbRes.json();
+    res.json(buildAutoTournamentDashboard(data.items || []));
+  } catch (err) {
+    console.error('Auto tournament dashboard error:', err.message);
+    res.status(502).json({ error: 'Failed to build auto tournament dashboard' });
+  }
+});
+
 function buildPocketBaseUrl(collection, id, query) {
   const params = new URLSearchParams(query);
   const baseUrl = id
@@ -526,5 +570,6 @@ module.exports = {
   summarizeChampionCounts,
   fetchSqlitePlaySessions,
   buildCountryWinnerStats,
-  buildRegionalWinnerStats
+  buildRegionalWinnerStats,
+  buildAutoTournamentDashboard
 };

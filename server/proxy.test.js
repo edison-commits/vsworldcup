@@ -11,7 +11,8 @@ const {
   inferCountryCode,
   buildCountryWinnerStats,
   buildRegionalWinnerStats,
-  summarizeChampionCounts
+  summarizeChampionCounts,
+  buildAutoTournamentDashboard
 } = require('./proxy');
 
 test('extractBalancedJsonObject ignores prose and braces inside strings', () => {
@@ -361,5 +362,41 @@ test('country winners route falls back to sqlite when PocketBase forbids stats r
     await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
     global.fetch = previousFetch;
     childProcess.execFileSync = previousExec;
+  }
+});
+
+
+test('buildAutoTournamentDashboard summarizes today, recent, and duplicate guard', () => {
+  const dashboard = buildAutoTournamentDashboard([
+    { tournament_id: 'auto-2026-06-30', title: 'Best Ramen Styles', category: 'food', plays: 12, featured: true, status: 'active', created: '2026-06-30 00:01:00' },
+    { tournament_id: 'auto-2026-06-29', title: 'Best Summer Songs', category: 'music', plays: 7, featured: true, status: 'active', created: '2026-06-29 00:01:00' },
+    { tournament_id: 'manual-1', title: 'Manual', status: 'draft' }
+  ], new Date('2026-06-30T12:00:00Z'));
+  assert.equal(dashboard.today_id, 'auto-2026-06-30');
+  assert.equal(dashboard.today_created, true);
+  assert.equal(dashboard.today.title, 'Best Ramen Styles');
+  assert.equal(dashboard.active_auto_tournaments, 2);
+  assert.match(dashboard.duplicate_guard, /normalized-title/);
+});
+
+test('auto tournament dashboard route returns recent generated tournaments', async () => {
+  const previousFetch = global.fetch;
+  global.fetch = async (url) => {
+    assert.match(String(url), /author%3D%22AI\+Generated%22|author%3D%22AI%20Generated%22|author=%22AI\+Generated%22/);
+    return new Response(JSON.stringify({ items: [
+      { tournament_id: 'auto-2026-06-30', title: 'Best Ramen Styles', category: 'food', plays: 12, featured: true, status: 'active' }
+    ] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const server = app.listen(0);
+  try {
+    const { port } = server.address();
+    const response = await previousFetch(`http://127.0.0.1:${port}/api/stats/auto-tournaments?limit=5`);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.recent[0].id, 'auto-2026-06-30');
+    assert.equal(body.active_auto_tournaments, 1);
+  } finally {
+    await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+    global.fetch = previousFetch;
   }
 });

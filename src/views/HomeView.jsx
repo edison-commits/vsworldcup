@@ -1,5 +1,6 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import SafeImage from "../components/SafeImage";
+import { dedupeTournamentsForDisplay, getTournamentStats } from "../lib/homeFilters";
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -25,6 +26,7 @@ function cardCollageItems(items = []) {
   return [0, 1, 2, 3].map((idx) => ({
     src: items[idx]?.img || fallback,
     fallback: items[idx]?.fallbackImg || fallback,
+    name: items[idx]?.name || items[0]?.name || "Tournament entry",
   }));
 }
 
@@ -212,7 +214,7 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
     >
       <div style={{ height: 188, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", background: "linear-gradient(135deg, rgba(255,0,102,0.12), rgba(0,229,255,0.12))" }}>
         {collage.map((image, idx) => (
-          <SafeImage key={(image.src || image.fallback || "img") + idx} src={image.src} fallbackSrc={image.fallback} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
+          <SafeImage key={(image.src || image.fallback || "img") + idx} src={image.src} fallbackSrc={image.fallback} alt={image.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: idx === 0 ? "none" : "saturate(0.92)" }} />
         ))}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.2) 52%, rgba(10,10,15,0.05) 100%)" }} />
 
@@ -269,7 +271,9 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
   const [search, setSearch] = useState("");
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
 
-  const catFiltered = fc === "all" ? tournaments : tournaments.filter((tr) => tr.category === fc);
+  const displayTournaments = useMemo(() => dedupeTournamentsForDisplay(tournaments), [tournaments]);
+  const stats = useMemo(() => getTournamentStats(tournaments, CATEGORIES), [tournaments, CATEGORIES]);
+  const catFiltered = fc === "all" ? displayTournaments : displayTournaments.filter((tr) => tr.category === fc);
   const searchFiltered = search.trim()
     ? catFiltered.filter((tr) => tr.title.toLowerCase().includes(search.toLowerCase().trim()))
     : catFiltered;
@@ -285,10 +289,22 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
       <div style={{ textAlign: "center", marginBottom: 32, padding: "36px 20px", background: "radial-gradient(ellipse at center,var(--accentGlow) 0%,transparent 70%)", borderRadius: 24 }}>
         <h1 style={{ fontFamily: "Outfit,sans-serif", fontSize: "clamp(30px,6vw,52px)", fontWeight: 900, margin: 0, lineHeight: 1.1, color: "var(--text)" }}>{t.pickYour} <span style={{ background: "linear-gradient(135deg,var(--accent),#ffaa00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "inline-block", textShadow: "none" }}>{t.favorite}</span></h1>
-        <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, color: "var(--textDim)", margin: "14px auto 26px", maxWidth: 520 }}>{t.heroSub}</p>
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+        <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, color: "var(--textDim)", margin: "14px auto 18px", maxWidth: 520 }}>{t.heroSub}</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
           <button onClick={() => setView("create")} style={{ background: "linear-gradient(135deg,var(--accent),#ff6699)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 36px", fontSize: 16, fontWeight: 700, fontFamily: "Outfit,sans-serif", cursor: "pointer", boxShadow: "0 8px 30px var(--accentGlow)" }}>{t.createTournament}</button>
           <button onClick={onQuickMode} style={{ background: "var(--surfaceLight)", color: "var(--accentAlt)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 28px", fontSize: 16, fontWeight: 700, fontFamily: "Outfit,sans-serif", cursor: "pointer" }}>⚡ Quick Mode</button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+          {[
+            [formatNumber(stats.total), "tournaments"],
+            [formatNumber(stats.categories), "categories"],
+            [formatNumber(stats.plays), "plays logged"],
+          ].map(([value, label]) => (
+            <div key={label} style={{ minWidth: 118, padding: "10px 14px", borderRadius: 14, border: "1px solid var(--border)", background: "rgba(255,255,255,0.035)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+              <div style={{ fontFamily: "Space Mono,monospace", fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{value}</div>
+              <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, color: "var(--textDim)", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -333,17 +349,27 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
-        <button onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
+      <div className="vs-category-rail" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
+        <button className="vs-chip" onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
         {CATEGORIES.filter((c) => c.id !== "custom").map((cat) => (
-          <button key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
+          <button className="vs-chip" key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
+      <div className="vs-sort-rail" style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
         {[["popular", "🔥 Popular"], ["new", "✨ New"], ["az", "A→Z"]].map(([k, label]) => (
-          <button key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
+          <button className="vs-chip" key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
         ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 14, color: "var(--textDim)" }}>
+          Showing <strong style={{ color: "var(--text)" }}>{filtered.length}</strong> of {displayTournaments.length} tournaments
+          {search ? <> for <strong style={{ color: "var(--accent)" }}>“{search}”</strong></> : null}
+        </div>
+        {(search || fc !== "all") && (
+          <button onClick={() => { setSearch(""); setFc("all"); }} style={{ background: "transparent", color: "var(--accentAlt)", border: "1px solid var(--border)", borderRadius: 999, padding: "7px 12px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear filters</button>
+        )}
       </div>
 
       {/* Loading Skeleton */}

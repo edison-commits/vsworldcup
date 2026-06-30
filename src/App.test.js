@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import App from "./App";
 import { getDailyChallengeIndex, normalizeTournamentRecords } from "./lib/tournaments";
@@ -35,6 +35,11 @@ afterEach(() => {
 
 test("renders VS WORLDCUP home screen", async () => {
   render(<App />);
+
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
   expect(screen.getByText(/Pick Your/i)).toBeInTheDocument();
   expect(screen.getByText(/Create Tournament/i)).toBeInTheDocument();
 });

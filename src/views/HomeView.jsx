@@ -100,37 +100,44 @@ function DailyChallengeBanner({ tournament, onPlay, lang, T }) {
 
   if (!tournament) return null;
   return (
-    <div
+    <button
+      type="button"
       onClick={onPlay}
+      className="vs-featured-challenge"
       style={{
-        border: "1px solid rgba(255,215,0,0.25)",
-        background: "linear-gradient(135deg, rgba(255,215,0,0.12), rgba(255,102,153,0.08))",
-        borderRadius: 20,
-        padding: "20px 24px",
-        marginBottom: 28,
+        width: "100%",
+        textAlign: "left",
+        border: "1px solid rgba(255,215,0,0.26)",
+        background: "linear-gradient(135deg, rgba(255,215,0,0.14), rgba(255,102,153,0.08))",
+        borderRadius: 22,
+        padding: "18px 20px",
+        marginBottom: 24,
         cursor: "pointer",
-        display: "flex",
+        display: "grid",
+        gridTemplateColumns: "auto minmax(0,1fr) auto auto",
         alignItems: "center",
-        gap: 16,
-        transition: "all 0.2s",
-        flexWrap: "wrap",
+        gap: 14,
+        transition: "border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), transform 160ms var(--ease-out)",
       }}
     >
-      <div style={{ fontSize: 32 }}>🏆</div>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: "var(--gold)", marginBottom: 4 }}>
+      <div aria-hidden="true" style={{ fontSize: 32 }}>🏆</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 2, color: "var(--gold)", marginBottom: 4 }}>
           {t.dailyChallenge}
         </div>
-        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 18, fontWeight: 800, color: "var(--text)" }}>{tournament.title}</div>
-        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", marginTop: 2 }}>
+        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 19, fontWeight: 900, color: "var(--text)", lineHeight: 1.15 }}>{tournament.title}</div>
+        <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", marginTop: 3 }}>
           {tournament.items.length} {t.entries} · {t.sameBracket}
         </div>
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "auto" }}>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
         <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: "var(--textDim)" }}>{t.resetsIn}</div>
-        <div style={{ fontFamily: "Space Mono,monospace", fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>{hours}h {mins}m</div>
+        <div style={{ fontFamily: "Space Mono,monospace", fontSize: 16, fontWeight: 800, color: "var(--accent)" }}>{hours}h {mins}m</div>
       </div>
-    </div>
+      <span className="vs-featured-challenge__cta" style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 800, color: "#0b0b12", background: "var(--gold)", borderRadius: 999, padding: "10px 14px", whiteSpace: "nowrap" }}>
+        Play daily
+      </span>
+    </button>
   );
 }
 
@@ -165,7 +172,7 @@ function RecentlyPlayed({ recentPlays, tournaments, onSelect, lang, T }) {
             <div
               key={play.id + "-" + idx}
               onClick={() => tr && onSelect(tr)}
-              style={{ flexShrink: 0, width: 200, background: "var(--surfaceLight)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", cursor: tr ? "pointer" : "default", opacity: tr ? 1 : 0.5, transition: "all 0.2s" }}
+              style={{ flexShrink: 0, width: 200, background: "var(--surfaceLight)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", cursor: tr ? "pointer" : "default", opacity: tr ? 1 : 0.5, transition: "border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), opacity 160ms var(--ease-out)" }}
               onMouseEnter={(e) => {
                 if (tr) {
                   e.currentTarget.style.borderColor = "var(--accent)";
@@ -266,6 +273,8 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
   const t = { ...(T.en || {}), ...((T && T[lang]) || {}) };
   const cat = CATEGORIES.find((c) => c.id === tournament.category);
   const collage = cardCollageItems(tournament.items);
+  const plays = tournament.plays || 0;
+  const playsLabel = plays > 0 ? `▶ ${formatNumber(plays)} ${t.plays}` : "New bracket";
 
   // Badge logic
   const isTrending = (tournament.plays || 0) >= 30000;
@@ -284,7 +293,8 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ background: "var(--surface)", border: hover ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "all 0.3s", transform: hover ? "translateY(-4px)" : "none", boxShadow: hover ? "0 12px 40px var(--accentGlow)" : "var(--cardShadow)" }}
+      className="vs-tournament-card"
+      style={{ background: "var(--surface)", border: hover ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), transform 180ms var(--ease-out)", transform: hover ? "translateY(-4px)" : "none", boxShadow: hover ? "0 12px 40px var(--accentGlow)" : "var(--cardShadow)" }}
     >
       <div style={{ height: 188, position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", background: "linear-gradient(135deg, rgba(255,0,102,0.12), rgba(0,229,255,0.12))" }}>
         {collage.map((image, idx) => (
@@ -333,7 +343,11 @@ const TournamentCard = memo(function TournamentCard({ tournament, onClick, lang,
       <div style={{ padding: "14px 18px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
           <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.by} {tournament.author}</span>
-          <span style={{ fontFamily: "Space Mono,monospace", fontSize: 13, color: "var(--accent)", flexShrink: 0 }}>▶ {formatNumber(tournament.plays)} {t.plays}</span>
+          <span style={{ fontFamily: "Space Mono,monospace", fontSize: 12, color: plays > 0 ? "var(--accent)" : "var(--gold)", flexShrink: 0 }}>{playsLabel}</span>
+        </div>
+        <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, color: "var(--textDim)" }}>Two choices. One champion.</span>
+          <span className="vs-card-play-affordance" style={{ fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 800, color: "#fff", background: "rgba(255,51,102,0.22)", border: "1px solid rgba(255,51,102,0.35)", borderRadius: 999, padding: "7px 10px", whiteSpace: "nowrap" }}>Play bracket</span>
         </div>
       </div>
     </div>
@@ -363,12 +377,14 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
-      <div style={{ textAlign: "center", marginBottom: 32, padding: "36px 20px", background: "radial-gradient(ellipse at center,var(--accentGlow) 0%,transparent 70%)", borderRadius: 24 }}>
-        <h1 style={{ fontFamily: "Outfit,sans-serif", fontSize: "clamp(30px,6vw,52px)", fontWeight: 900, margin: 0, lineHeight: 1.1, color: "var(--text)" }}>{t.pickYour} <span style={{ background: "linear-gradient(135deg,var(--accent),#ffaa00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "inline-block", textShadow: "none" }}>{t.favorite}</span></h1>
-        <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, color: "var(--textDim)", margin: "14px auto 18px", maxWidth: 520 }}>{t.heroSub}</p>
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
-          <button onClick={() => setView("create")} style={{ background: "linear-gradient(135deg,var(--accent),#ff6699)", color: "#fff", border: "none", borderRadius: 12, padding: "14px 36px", fontSize: 16, fontWeight: 700, fontFamily: "Outfit,sans-serif", cursor: "pointer", boxShadow: "0 8px 30px var(--accentGlow)" }}>{t.createTournament}</button>
-          <button onClick={onQuickMode} style={{ background: "var(--surfaceLight)", color: "var(--accentAlt)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 28px", fontSize: 16, fontWeight: 700, fontFamily: "Outfit,sans-serif", cursor: "pointer" }}>⚡ Quick Mode</button>
+      <div className="vs-home-hero" style={{ textAlign: "center", marginBottom: 24, padding: "42px 20px", background: "radial-gradient(ellipse at center,var(--accentGlow) 0%,transparent 70%)", borderRadius: 28 }}>
+        <div style={{ fontFamily: "Space Mono,monospace", fontSize: 11, color: "var(--accentAlt)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Pick fast. Crown one champion.</div>
+        <h1 style={{ fontFamily: "Outfit,sans-serif", fontSize: "clamp(32px,6vw,58px)", fontWeight: 950, margin: 0, lineHeight: 1.02, color: "var(--text)" }}>{t.pickYour} <span style={{ background: "linear-gradient(135deg,var(--accent),#ffaa00)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "inline-block", textShadow: "none" }}>{t.favorite}</span></h1>
+        <p style={{ fontFamily: "Outfit,sans-serif", fontSize: 17, color: "var(--textDim)", margin: "16px auto 20px", maxWidth: 560 }}>{t.heroSub}</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 22 }}>
+          <button onClick={dailyChallenge ? onDailyChallenge : onQuickMode} style={{ background: "linear-gradient(135deg,var(--accent),#ff6699)", color: "#fff", border: "none", borderRadius: 14, padding: "15px 34px", fontSize: 16, fontWeight: 800, fontFamily: "Outfit,sans-serif", cursor: "pointer", boxShadow: "0 8px 30px var(--accentGlow)", transition: "transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out)" }}>{dailyChallenge ? "🏆 Play today's challenge" : "⚡ Start quick mode"}</button>
+          <button onClick={onQuickMode} style={{ background: "rgba(255,255,255,0.06)", color: "var(--accentAlt)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 24px", fontSize: 15, fontWeight: 800, fontFamily: "Outfit,sans-serif", cursor: "pointer" }}>⚡ Quick Mode</button>
+          <button onClick={() => setView("create")} style={{ background: "transparent", color: "var(--textDim)", border: "1px solid var(--border)", borderRadius: 14, padding: "15px 22px", fontSize: 15, fontWeight: 700, fontFamily: "Outfit,sans-serif", cursor: "pointer" }}>{t.createTournament}</button>
         </div>
         <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
           {[
@@ -387,13 +403,12 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
       <DailyChallengeBanner tournament={dailyChallenge} onPlay={onDailyChallenge} lang={lang} T={T} />
       <ResumeBanner resumeGame={resumeGame} onResumeGame={onResumeGame} lang={lang} T={T} />
       <VotingProfileCard recentPlays={recentPlays} />
-      <SponsorExperimentCard slot={sponsorSlot} />
       <RecentlyPlayed recentPlays={recentPlays} tournaments={tournaments} onSelect={onSelect} lang={lang} T={T} />
       {!isLoading && !search && fc === "all" && <DiscoveryShelves rows={discoveryRows} onSelect={onSelect} />}
 
-      {/* SEARCH BAR */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ position: "relative", maxWidth: 480, margin: "0 auto" }}>
+      {/* BROWSE TOOLBAR */}
+      <div className="vs-browse-toolbar" style={{ marginBottom: 20, padding: "16px", background: "rgba(255,255,255,0.035)", border: "1px solid var(--border)", borderRadius: 22 }}>
+        <div style={{ position: "relative", maxWidth: 560, margin: "0 auto 14px" }}>
           <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 18, pointerEvents: "none", opacity: 0.5 }}>🔍</span>
           <input
             type="text"
@@ -426,7 +441,6 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
             <button onClick={() => setSearch("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--textDim)", cursor: "pointer", fontSize: 14, padding: 4 }}>✕</button>
           )}
         </div>
-      </div>
 
       <div className="vs-category-rail" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
         <button className="vs-chip" onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
@@ -435,9 +449,9 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
         ))}
       </div>
 
-      <div className="vs-sort-rail" style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>
+      <div className="vs-sort-rail" style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
         {[["popular", "🔥 Popular"], ["new", "✨ New"], ["az", "A→Z"]].map(([k, label]) => (
-          <button className="vs-chip" key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{label}</button>
+          <button className="vs-chip" key={k} onClick={() => setSortMode(k)} style={{ background: sortMode === k ? "var(--accent)" : "transparent", color: sortMode === k ? "#fff" : "var(--textDim)", border: "1px solid " + (sortMode === k ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "5px 14px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background-color 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out)" }}>{label}</button>
         ))}
       </div>
 
@@ -450,6 +464,9 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
           <button onClick={() => { setSearch(""); setFc("all"); }} style={{ background: "transparent", color: "var(--accentAlt)", border: "1px solid var(--border)", borderRadius: 999, padding: "7px 12px", fontFamily: "Outfit,sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear filters</button>
         )}
       </div>
+      </div>
+
+      <SponsorExperimentCard slot={sponsorSlot} />
 
       {/* Loading Skeleton */}
       {isLoading && (

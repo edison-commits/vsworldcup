@@ -1,9 +1,13 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  buildCategoryMeta,
+  buildSitemapUrls,
   buildTournamentMeta,
   renderMetaHtml,
+  renderRobotsTxt,
   renderShareCardSvg,
+  renderSitemapXml,
 } = require('./server');
 
 test('buildTournamentMeta produces route-specific canonical share metadata', () => {
@@ -40,4 +44,35 @@ test('renderShareCardSvg escapes tournament copy and includes brand composition'
   assert.match(svg, /Fast &lt;Food&gt; &amp; Friends/);
   assert.match(svg, /Pizza &quot;wins&quot; &amp; burgers try again/);
   assert.doesNotMatch(svg, /<Food>/);
+});
+
+test('sitemap includes homepage, categories, tournament pages, and results pages', () => {
+  const urls = buildSitemapUrls();
+  const locs = urls.map((url) => url.loc);
+
+  assert.ok(locs.length >= 35);
+  assert.ok(locs.includes('https://vsworldcup.com/'));
+  assert.ok(locs.includes('https://vsworldcup.com/c/food'));
+  assert.ok(locs.includes('https://vsworldcup.com/t/fast-food'));
+  assert.ok(locs.includes('https://vsworldcup.com/t/fast-food/results'));
+
+  const xml = renderSitemapXml(urls);
+  assert.match(xml, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
+  assert.match(xml, /<urlset xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/);
+  assert.equal((xml.match(/<loc>/g) || []).length, urls.length);
+  assert.doesNotMatch(xml, /<html/i);
+});
+
+test('robots advertises the sitemap', () => {
+  const robots = renderRobotsTxt();
+  assert.match(robots, /User-agent: \*/);
+  assert.match(robots, /Sitemap: https:\/\/vsworldcup.com\/sitemap.xml/);
+});
+
+test('category metadata is crawlable for SEO landing pages', () => {
+  const meta = buildCategoryMeta('anime');
+  assert.equal(meta.url, 'https://vsworldcup.com/c/anime');
+  assert.match(meta.title, /Anime Bracket Tournaments/);
+  assert.match(meta.description, /anime bracket tournaments/i);
+  assert.equal(buildCategoryMeta('unknown'), null);
 });

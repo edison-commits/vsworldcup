@@ -5,6 +5,7 @@ const fs = require("fs");
 const PORT = Number(process.env.PORT || 3000);
 const BUILD = path.join(__dirname, "build");
 const SITE_URL = "https://vsworldcup.com";
+const SITEMAP_UPDATED = "2026-07-10";
 
 const TOURNAMENTS = {
   "fast-food":"Fast Food World Cup","dream-vacation":"Dream Vacation World Cup",
@@ -33,6 +34,15 @@ const DESCRIPTIONS = {
   "best-games":"Zelda vs GTA vs Minecraft — crown the best video game ever."
 };
 
+const CATEGORY_PAGES = {
+  food: { title: "Food Bracket Tournaments - VS WORLDCUP", description: "Play food bracket tournaments and pick champions across fast food, pizza toppings, comfort foods, drinks, and more." },
+  movies: { title: "Movie Bracket Tournaments - VS WORLDCUP", description: "Play movie bracket tournaments and crown winners across films, streaming shows, characters, and villains." },
+  anime: { title: "Anime Bracket Tournaments - VS WORLDCUP", description: "Play anime bracket tournaments and choose champions from iconic shows, films, characters, and studios." },
+  music: { title: "Music Bracket Tournaments - VS WORLDCUP", description: "Play music bracket tournaments for artists, albums, songs, K-pop groups, rap classics, and more." },
+  games: { title: "Video Game Bracket Tournaments - VS WORLDCUP", description: "Play video game bracket tournaments and decide the best games, bosses, franchises, and gaming moments." },
+  sports: { title: "Sports Bracket Tournaments - VS WORLDCUP", description: "Play sports bracket tournaments and crown champions across sports, athletes, teams, and fan debates." },
+};
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
@@ -40,6 +50,38 @@ function escapeHtml(s) {
 function replaceOrInsertHead(html, pattern, replacement) {
   if (pattern.test(html)) return html.replace(pattern, replacement);
   return html.replace("</head>", `${replacement}\n</head>`);
+}
+
+function escapeXml(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+}
+
+function buildSitemapUrls() {
+  const urls = [{ loc: `${SITE_URL}/`, priority: "1.0", changefreq: "daily" }];
+  Object.keys(CATEGORY_PAGES).forEach((slug) => {
+    urls.push({ loc: `${SITE_URL}/c/${slug}`, priority: "0.75", changefreq: "weekly" });
+  });
+  Object.keys(TOURNAMENTS).forEach((id) => {
+    urls.push({ loc: `${SITE_URL}/t/${encodeURIComponent(id)}`, priority: "0.85", changefreq: "weekly" });
+    urls.push({ loc: `${SITE_URL}/t/${encodeURIComponent(id)}/results`, priority: "0.7", changefreq: "weekly" });
+  });
+  return urls;
+}
+
+function renderSitemapXml(urls = buildSitemapUrls()) {
+  const entries = urls.map(({ loc, priority, changefreq }) => `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${SITEMAP_UPDATED}</lastmod>\n    <changefreq>${escapeXml(changefreq)}</changefreq>\n    <priority>${escapeXml(priority)}</priority>\n  </url>`).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`;
+}
+
+function renderRobotsTxt() {
+  return `# https://www.robotstxt.org/robotstxt.html\nUser-agent: *\nDisallow:\nSitemap: ${SITE_URL}/sitemap.xml\n`;
+}
+
+function buildCategoryMeta(category) {
+  const page = CATEGORY_PAGES[category];
+  if (!page) return null;
+  const url = `${SITE_URL}/c/${encodeURIComponent(category)}`;
+  return { title: page.title, cardTitle: page.title.replace(" - VS WORLDCUP", ""), description: page.description, label: "PLAY BRACKETS", url, image: `${SITE_URL}/og-image.png` };
 }
 
 function buildTournamentMeta(tid, isResults) {
@@ -114,6 +156,18 @@ function createApp() {
     res.send(renderMetaHtml(indexHtml, meta));
   }
 
+  app.get("/robots.txt", function(req, res) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(renderRobotsTxt());
+  });
+
+  app.get("/sitemap.xml", function(req, res) {
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(renderSitemapXml());
+  });
+
   app.get("/og/:id.svg", function(req, res) {
     const meta = buildTournamentMeta(req.params.id, false);
     if (!meta) return res.status(404).send("Not found");
@@ -123,6 +177,11 @@ function createApp() {
   });
   app.get("/t/:id", serveTournament);
   app.get("/t/:id/results", serveTournament);
+  app.get("/c/:category", function(req, res) {
+    const meta = buildCategoryMeta(req.params.category);
+    if (!meta) return res.send(indexHtml);
+    res.send(renderMetaHtml(indexHtml, meta));
+  });
   app.get("/embed", function(req, res) { res.sendFile(path.join(BUILD, "embed.html")); });
   app.use(express.static(BUILD));
   app.use(function(req, res) { res.sendFile(path.join(BUILD, "index.html")); });
@@ -133,4 +192,4 @@ if (require.main === module) {
   createApp().listen(PORT, function() { console.log("VS WORLDCUP on port " + PORT); });
 }
 
-module.exports = { buildTournamentMeta, createApp, renderMetaHtml, renderShareCardSvg };
+module.exports = { buildCategoryMeta, buildSitemapUrls, buildTournamentMeta, createApp, renderMetaHtml, renderRobotsTxt, renderShareCardSvg, renderSitemapXml };

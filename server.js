@@ -5,7 +5,16 @@ const fs = require("fs");
 const PORT = Number(process.env.PORT || 3000);
 const BUILD = path.join(__dirname, "build");
 const SITE_URL = "https://vsworldcup.com";
-const SITEMAP_UPDATED = "2026-07-10";
+const SITEMAP_UPDATED = "2026-08-24";
+
+const MEDIA_KIT_META = {
+  title: "Sponsor & Creator Media Kit - VS WORLDCUP",
+  cardTitle: "VS WORLDCUP Media Kit",
+  description: "A source-backed sponsor and creator kit for measured bracket activations, starting with Food Debate Week.",
+  label: "VIEW MEDIA KIT",
+  url: `${SITE_URL}/media-kit`,
+  image: `${SITE_URL}/og/media-kit.svg`,
+};
 
 const TOURNAMENTS = {
   "fast-food":"Fast Food World Cup","dream-vacation":"Dream Vacation World Cup",
@@ -57,7 +66,10 @@ function escapeXml(s) {
 }
 
 function buildSitemapUrls() {
-  const urls = [{ loc: `${SITE_URL}/`, priority: "1.0", changefreq: "daily" }];
+  const urls = [
+    { loc: `${SITE_URL}/`, priority: "1.0", changefreq: "daily" },
+    { loc: MEDIA_KIT_META.url, priority: "0.65", changefreq: "monthly" },
+  ];
   Object.keys(CATEGORY_PAGES).forEach((slug) => {
     urls.push({ loc: `${SITE_URL}/c/${slug}`, priority: "0.75", changefreq: "weekly" });
   });
@@ -169,7 +181,7 @@ function createApp() {
   });
 
   app.get("/og/:id.svg", function(req, res) {
-    const meta = buildTournamentMeta(req.params.id, false);
+    const meta = req.params.id === "media-kit" ? MEDIA_KIT_META : buildTournamentMeta(req.params.id, false);
     if (!meta) return res.status(404).send("Not found");
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=3600");
@@ -177,6 +189,7 @@ function createApp() {
   });
   app.get("/t/:id", serveTournament);
   app.get("/t/:id/results", serveTournament);
+  app.get("/media-kit", function(req, res) { res.send(renderMetaHtml(indexHtml, MEDIA_KIT_META)); });
   app.get("/c/:category", function(req, res) {
     const meta = buildCategoryMeta(req.params.category);
     if (!meta) return res.send(indexHtml);
@@ -192,4 +205,4 @@ if (require.main === module) {
   createApp().listen(PORT, function() { console.log("VS WORLDCUP on port " + PORT); });
 }
 
-module.exports = { buildCategoryMeta, buildSitemapUrls, buildTournamentMeta, createApp, renderMetaHtml, renderRobotsTxt, renderShareCardSvg, renderSitemapXml };
+module.exports = { MEDIA_KIT_META, buildCategoryMeta, buildSitemapUrls, buildTournamentMeta, createApp, renderMetaHtml, renderRobotsTxt, renderShareCardSvg, renderSitemapXml };

@@ -26,7 +26,9 @@ import CreateView from "./views/CreateView";
 import { QuickMode, QuickResults } from "./views/QuickMode";
 import RankingsView from "./views/RankingsView";
 import WinnerScreen from "./views/WinnerBundle";
+import MediaKitView from "./views/MediaKitView";
 import SafeImage from "./components/SafeImage";
+import { trackEvent } from "./lib/analytics";
 
 // ============================================================
 // TRANSLATIONS
@@ -951,7 +953,7 @@ function Header({currentView,setView,setSelectedTournament,lang,setLang,themeMod
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <nav style={{display:"flex",gap:4}}>
-            {[{id:"home",label:t.browse},{id:"create",label:t.create}].map(tab=>
+            {[{id:"home",label:t.browse},{id:"create",label:t.create},{id:"mediaKit",label:"Media Kit"}].map(tab=>
               <button key={tab.id} onClick={()=>{setView(tab.id);setSelectedTournament(null);}} style={{background:currentView===tab.id?"var(--accent)":"transparent",color:currentView===tab.id?"#fff":"var(--textDim)",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600,cursor:"pointer"}}>{tab.label}</button>
             )}
           </nav>
@@ -1005,7 +1007,9 @@ function GamePlay({tournament,bracketSize,onFinish,onStart,onBack,lang}) {
     if(onStart&&tournament){
       onStart({ tournamentId:tournament.id, bracketSize, updatedAt:Date.now() });
     }
-  },[onStart,tournament,bracketSize]);
+  // Start is tied to a newly mounted/changed bracket, not callback identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[tournament.id,bracketSize]);
 
   // Play audio preview when matchup changes
   useEffect(()=>{
@@ -1314,6 +1318,11 @@ export default function App() {
     if(urlRoutedRef.current)return;
     if(viewRef.current!=="home"){urlRoutedRef.current=true;return;}
     const path = initialPathRef.current;
+    if(path==="/media-kit"){
+      setView("mediaKit");
+      urlRoutedRef.current=true;
+      return;
+    }
     if(!path.startsWith("/t/")){urlRoutedRef.current=true;return;}
     const isResults = /\/results$/.test(path);
     const tid = path.slice(3).replace(/\/results$/, "");
@@ -1346,6 +1355,9 @@ export default function App() {
       window.history.replaceState(null,"",`/t/${selectedTournament.id}/results?${qs}`);
     } else if(view==="home"){
       window.history.replaceState(null,"","/");
+    } else if(view==="mediaKit"){
+      const mediaKitSearch = initialPathRef.current === "/media-kit" ? initialSearchRef.current : "";
+      window.history.replaceState(null,"",`/media-kit${mediaKitSearch}`);
     }
   },[view,selectedTournament,winner]);
 
@@ -1384,6 +1396,11 @@ export default function App() {
     clearActiveGame();
     setResumeGame(null);
     saveLastResult({ tournamentId: selectedTournament?.id, winner: w.name, finishedAt: Date.now() });
+    trackEvent("tournament_completed", {
+      tournament_id: selectedTournament?.id || "unknown",
+      category: selectedTournament?.category || "custom",
+      bracket_size: bracketSize || selectedTournament?.items?.length || 0,
+    });
     // Save to recently played (localStorage)
     try{const rp={id:selectedTournament?.id,title:selectedTournament?.title||"Unknown",champion:w.name,category:selectedTournament?.category||"custom",timestamp:Date.now()};
       addRecentPlay(rp);
@@ -1415,6 +1432,19 @@ export default function App() {
         body: JSON.stringify(payload),
       }).catch(()=>{});
     } catch(e) { console.error("Session save error:", e); }
+  };
+
+  const handleGameStart=useCallback((payload)=>{
+    saveActiveGame(payload);
+    setResumeGame(payload);
+  },[]);
+
+  const trackFreshTournamentStart=(tournament,size)=>{
+    trackEvent("tournament_started", {
+      tournament_id: tournament?.id || "unknown",
+      category: tournament?.category || "custom",
+      bracket_size: size || 0,
+    });
   };
 
   const handleOnboardComplete=(data)=>{
@@ -1453,7 +1483,7 @@ export default function App() {
 
       <Header currentView={view} setView={setView} setSelectedTournament={setST} lang={lang} setLang={setLang} themeMode={themeMode} setThemeMode={setThemeMode} soundEnabled={soundEnabled} toggleSound={toggleSound}/>
 
-      {view==="home"&&<HomeView tournaments={tournaments} dailyChallenge={dailyChallenge} recentPlays={recentPlays} resumeGame={resumeGame} onResumeGame={(game)=>{const found=tournaments.find(t=>t.id===game?.tournamentId); if(found){setST(found); setBS(game.bracketSize||found.items.length||16); setView("play");}}} onSelect={tr=>{setST(tr);setView("roundSelect");}} setView={setView} onQuickMode={()=>setView("quick")} onDailyChallenge={()=>{setST(dailyChallenge);setBS(16);setView("play");}} lang={lang} sortMode={sortMode} setSortMode={setSortMode} T={T} CATEGORIES={CATEGORIES} onFeedback={()=>setShowFeedback(true)}/>}
+      {view==="home"&&<HomeView tournaments={tournaments} dailyChallenge={dailyChallenge} recentPlays={recentPlays} resumeGame={resumeGame} onResumeGame={(game)=>{const found=tournaments.find(t=>t.id===game?.tournamentId); if(found){setST(found);setBS(game.bracketSize||found.items.length||16);setView("play");}}} onSelect={tr=>{setST(tr);setView("roundSelect");}} setView={setView} onQuickMode={()=>setView("quick")} onDailyChallenge={()=>{trackFreshTournamentStart(dailyChallenge,16);setST(dailyChallenge);setBS(16);setView("play");}} lang={lang} sortMode={sortMode} setSortMode={setSortMode} T={T} CATEGORIES={CATEGORIES} onFeedback={()=>setShowFeedback(true)}/>}
 
       {view==="create"&&<CreateView onCreated={newT=>{
         setTournaments(p=>[newT,...p]);setST(newT);setView("roundSelect");
@@ -1467,9 +1497,9 @@ export default function App() {
         }).then(r=>{if(r.ok)console.log("Tournament saved to DB");}).catch(()=>{});
       }} lang={lang} T={T} CATEGORIES={CATEGORIES} AiGenerator={AiGenerator} isValidUrl={isValidUrl} itemGradientImg={itemGradientImg} getNextId={()=>_gid++} />}
 
-      {view==="roundSelect"&&selectedTournament&&selectedTournament.items&&<RoundSelector itemCount={selectedTournament.items.length} onSelect={s=>{try{setBS(s);setView("play");}catch(e){console.error("Bracket select error:",e);}}} lang={lang} T={T}/>}
+      {view==="roundSelect"&&selectedTournament&&selectedTournament.items&&<RoundSelector itemCount={selectedTournament.items.length} onSelect={s=>{try{trackFreshTournamentStart(selectedTournament,s);setBS(s);setView("play");}catch(e){console.error("Bracket select error:",e);}}} lang={lang} T={T}/>}
 
-      {view==="play"&&selectedTournament&&bracketSize&&<GamePlay tournament={selectedTournament} bracketSize={bracketSize} onFinish={handleGameFinish} onStart={(payload)=>{saveActiveGame(payload); setResumeGame(payload);}} onBack={()=>{setView("home");setST(null);}} lang={lang}/>}
+      {view==="play"&&selectedTournament&&bracketSize&&<GamePlay tournament={selectedTournament} bracketSize={bracketSize} onFinish={handleGameFinish} onStart={handleGameStart} onBack={()=>{setView("home");setST(null);}} lang={lang}/>}
 
       {view==="winner"&&selectedTournament&&winner&&<WinnerScreen tournament={selectedTournament} winner={winner} history={matchHistory} demographics={demographics} onPlayAgain={()=>{clearActiveGame(); setResumeGame(null); setView("home");setST(null);setWinner(null);maybeOnboard();}} onRematch={()=>{setView("play");}} onViewRanking={()=>setView("rankings")} onBack={()=>{clearActiveGame(); setResumeGame(null); setView("home");setST(null);setWinner(null);maybeOnboard();}} lang={lang} T={T} SFX={SFX} itemGradientImg={itemGradientImg} />}
 
@@ -1478,6 +1508,8 @@ export default function App() {
       {view==="quick"&&<QuickMode tournaments={tournaments} onFinish={picks=>{setQP(picks);setView("quickResults");}} SFX={SFX} shuffleArray={shuffleArray} lang={lang} T={T} />}
 
       {view==="quickResults"&&<QuickResults picks={quickPicks} onPlayAgain={()=>setView("quick")} onGoHome={()=>setView("home")} lang={lang} T={T} />}
+
+      {view==="mediaKit"&&<MediaKitView onBack={()=>setView("home")} />}
 
       {/* Floating feedback button + modal */}
       <FeedbackFAB onClick={()=>setShowFeedback(true)} />

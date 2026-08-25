@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  MEDIA_KIT_META,
   buildCategoryMeta,
   buildSitemapUrls,
   buildTournamentMeta,
@@ -52,6 +53,7 @@ test('sitemap includes homepage, categories, tournament pages, and results pages
 
   assert.ok(locs.length >= 35);
   assert.ok(locs.includes('https://vsworldcup.com/'));
+  assert.ok(locs.includes('https://vsworldcup.com/media-kit'));
   assert.ok(locs.includes('https://vsworldcup.com/c/food'));
   assert.ok(locs.includes('https://vsworldcup.com/t/fast-food'));
   assert.ok(locs.includes('https://vsworldcup.com/t/fast-food/results'));
@@ -67,6 +69,14 @@ test('robots advertises the sitemap', () => {
   const robots = renderRobotsTxt();
   assert.match(robots, /User-agent: \*/);
   assert.match(robots, /Sitemap: https:\/\/vsworldcup.com\/sitemap.xml/);
+});
+
+test('media kit metadata is explicit and makes no reach claim', () => {
+  assert.equal(MEDIA_KIT_META.url, 'https://vsworldcup.com/media-kit');
+  assert.match(MEDIA_KIT_META.title, /Media Kit/);
+  assert.match(MEDIA_KIT_META.description, /measured bracket activations/i);
+  assert.doesNotMatch(MEDIA_KIT_META.description, /users|visitors|impressions|reach/i);
+  assert.equal(MEDIA_KIT_META.image, 'https://vsworldcup.com/og/media-kit.svg');
 });
 
 test('category metadata is crawlable for SEO landing pages', () => {

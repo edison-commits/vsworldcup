@@ -2,7 +2,8 @@ import { memo, useEffect, useMemo, useState } from "react";
 import SafeImage from "../components/SafeImage";
 import { dedupeTournamentsForDisplay, getDiscoveryRows, getTournamentStats } from "../lib/homeFilters";
 import { buildVotingProfile } from "../lib/votingProfile";
-import { buildSponsorMailto, buildSponsorSlot } from "../lib/revenueExperiments";
+import { buildSponsorSlot } from "../lib/revenueExperiments";
+import { trackEvent } from "../lib/analytics";
 
 function formatNumber(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -204,7 +205,7 @@ function SponsorExperimentCard({ slot }) {
         <div style={{ fontFamily: "Outfit,sans-serif", fontSize: 13, color: "var(--textDim)", maxWidth: 520 }}>{slot.subtitle}</div>
         <div style={{ fontFamily: "Space Mono,monospace", fontSize: 10, color: "var(--textDim)", marginTop: 6 }}>{slot.disclaimer}</div>
       </div>
-      <a href={buildSponsorMailto({ title: slot.title, source: slot.source })} style={{ textDecoration: "none", color: "#fff", background: "var(--accent)", borderRadius: 999, padding: "10px 14px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 800 }}>{slot.cta}</a>
+      <a href={`/media-kit?source=${encodeURIComponent(slot.source || "home")}`} style={{ textDecoration: "none", color: "#fff", background: "var(--accent)", borderRadius: 999, padding: "10px 14px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 800 }}>View media kit</a>
     </div>
   );
 }
@@ -443,9 +444,9 @@ export default function HomeView({ tournaments, dailyChallenge, recentPlays, res
         </div>
 
       <div className="vs-category-rail" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 28, justifyContent: "center" }}>
-        <button className="vs-chip" onClick={() => setFc("all")} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
+        <button className="vs-chip" onClick={() => { setFc("all"); trackEvent("category_filtered", { category: "all", location: "home" }); }} style={{ background: fc === "all" ? "var(--accent)" : "var(--surfaceLight)", color: fc === "all" ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === "all" ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t.all}</button>
         {CATEGORIES.filter((c) => c.id !== "custom").map((cat) => (
-          <button className="vs-chip" key={cat.id} onClick={() => setFc(cat.id)} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
+          <button className="vs-chip" key={cat.id} onClick={() => { setFc(cat.id); trackEvent("category_filtered", { category: cat.id, location: "home" }); }} style={{ background: fc === cat.id ? "var(--accent)" : "var(--surfaceLight)", color: fc === cat.id ? "#fff" : "var(--textDim)", border: "1px solid " + (fc === cat.id ? "var(--accent)" : "var(--border)"), borderRadius: 20, padding: "7px 16px", fontFamily: "Outfit,sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{cat.emoji} {cat.label[lang] || cat.label.en}</button>
         ))}
       </div>
 

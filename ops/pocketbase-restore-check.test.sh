@@ -15,7 +15,8 @@ sqlite3 "$SOURCE/data.db" "CREATE TABLE votes (id INTEGER PRIMARY KEY, winner TE
 printf 'image bytes\n' > "$SOURCE/storage/assets/example.txt"
 archive="$BACKUPS/pocketbase-test.tar.gz"
 tar -czf "$archive" -C "$TMP_DIR" pb_data
-shasum -a 256 "$archive" > "$archive.sha256"
+archive_digest=$(shasum -a 256 "$archive" | cut -d ' ' -f 1)
+printf '%s  %s\n' "$archive_digest" 'obsolete/location/pocketbase-original.tar.gz' > "$archive.sha256"
 
 output=$(ARCHIVE="$archive" RESTORE_DIR="$RESTORE" bash "$RESTORE_SCRIPT")
 printf '%s\n' "$output"
@@ -25,6 +26,16 @@ grep -q 'restore-check=ok' <<< "$output"
 [ -f "$RESTORE/pb_data/storage/assets/example.txt" ] || { echo 'expected restored storage file' >&2; exit 1; }
 restored=$(sqlite3 "$RESTORE/pb_data/data.db" "SELECT winner FROM votes WHERE id = 1;")
 [ "$restored" = 'Pizza' ] || { echo "unexpected restored row: $restored" >&2; exit 1; }
+
+mismatched_archive="$BACKUPS/pocketbase-mismatched.tar.gz"
+cp "$archive" "$mismatched_archive"
+printf 'tampered\n' >> "$mismatched_archive"
+printf '%s  %s\n' "$archive_digest" 'obsolete/location/pocketbase-original.tar.gz' > "$mismatched_archive.sha256"
+if ARCHIVE="$mismatched_archive" RESTORE_DIR="$TMP_DIR/mismatched-restore" bash "$RESTORE_SCRIPT" >/tmp/pb-restore-mismatched.out 2>/tmp/pb-restore-mismatched.err; then
+  echo 'expected supplied archive checksum mismatch to fail' >&2
+  exit 1
+fi
+grep -q 'checksum verification failed for supplied ARCHIVE' /tmp/pb-restore-mismatched.err
 
 if ARCHIVE="$archive" RESTORE_DIR="$RESTORE" bash "$RESTORE_SCRIPT" >/tmp/pb-restore-existing.out 2>/tmp/pb-restore-existing.err; then
   echo 'expected existing RESTORE_DIR to fail closed' >&2

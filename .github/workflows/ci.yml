@@ -42,4 +42,7 @@ jobs:
           bash -n ops/vsworldcup-healthcheck.sh
           bash -n ops/pocketbase-backup.sh
           bash -n ops/pocketbase-backup.test.sh
+          bash -n ops/pocketbase-restore-check.sh
+          bash -n ops/pocketbase-restore-check.test.sh
           bash ops/pocketbase-backup.test.sh
+          bash ops/pocketbase-restore-check.test.sh

@@ -13,13 +13,17 @@ RESTORE_DIR=${RESTORE_DIR:-}
 [ -f "$ARCHIVE.sha256" ] || fail "checksum file is required: $ARCHIVE.sha256"
 [ ! -e "$RESTORE_DIR" ] || fail "RESTORE_DIR already exists; choose an empty proof directory: $RESTORE_DIR"
 
+expected_digest=$(awk 'NR == 1 { print $1; exit }' "$ARCHIVE.sha256" | tr '[:upper:]' '[:lower:]')
+[[ "$expected_digest" =~ ^[[:xdigit:]]{64}$ ]] || fail "checksum file does not contain a SHA-256 digest: $ARCHIVE.sha256"
+
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum -c "$ARCHIVE.sha256" >/dev/null
+  actual_digest=$(sha256sum "$ARCHIVE" | cut -d ' ' -f 1)
 elif command -v shasum >/dev/null 2>&1; then
-  shasum -a 256 -c "$ARCHIVE.sha256" >/dev/null
+  actual_digest=$(shasum -a 256 "$ARCHIVE" | cut -d ' ' -f 1)
 else
   fail 'neither sha256sum nor shasum is available for checksum verification'
 fi
+[ "$actual_digest" = "$expected_digest" ] || fail "checksum verification failed for supplied ARCHIVE: $ARCHIVE"
 
 tar -tzf "$ARCHIVE" >/dev/null
 mkdir -p "$RESTORE_DIR"

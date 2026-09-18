@@ -24,10 +24,16 @@ archive=$(find "$BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' | sort
 [ -s "$archive" ] || { echo 'archive is empty' >&2; exit 1; }
 [ -f "$archive.sha256" ] || { echo 'expected checksum file' >&2; exit 1; }
 
+recorded_archive=$(cut -d ' ' -f 3- "$archive.sha256")
+[ "$recorded_archive" = "$(basename "$archive")" ] || {
+  echo "expected portable checksum filename, got: $recorded_archive" >&2
+  exit 1
+}
+
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum -c "$archive.sha256" >/dev/null
+  (cd "$BACKUPS" && sha256sum -c "$(basename "$archive.sha256")" >/dev/null)
 else
-  shasum -a 256 -c "$archive.sha256" >/dev/null
+  (cd "$BACKUPS" && shasum -a 256 -c "$(basename "$archive.sha256")" >/dev/null)
 fi
 
 tar -tzf "$archive" | grep -q '^pb_data/data.db$'

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import SafeImage from "../components/SafeImage";
 import { buildResultShareKit, getShareUrlForPlatform } from "../lib/socialShare";
+import { trackEvent } from "../lib/analytics";
 
 const REACTION_EMOJIS = [
   { id: "fire", emoji: "🔥", label: "Great pick" },
@@ -56,10 +57,16 @@ function ShareCard({ tournament, winner, history, lang, T }) {
   const shareText = kit.captions[0];
   const fullText = getShareUrlForPlatform("clipboard", kit);
   const hasNativeShare = typeof navigator !== "undefined" && !!navigator.share;
+  const trackShare = (platform) => trackEvent("result_shared", {
+    platform,
+    tournament_id: tournament.id || "unknown",
+    category: tournament.category || "custom",
+  });
 
   const nativeShare = async () => {
     try {
       await navigator.share({ title: `VS WORLDCUP - ${tournament.title}`, text: shareText, url: shareUrl });
+      trackShare("native");
       setShared(true);
       setTimeout(() => setShared(false), 3000);
     } catch (e) {}
@@ -67,8 +74,15 @@ function ShareCard({ tournament, winner, history, lang, T }) {
 
   const copyToClipboard = () => {
     navigator.clipboard?.writeText(fullText).then(() => {
+      trackShare("clipboard");
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  const copyCaption = (caption) => {
+    navigator.clipboard?.writeText(`${caption}\n${shareUrl}`).then(() => {
+      trackShare("caption_clipboard");
     }).catch(() => {});
   };
 
@@ -93,7 +107,7 @@ function ShareCard({ tournament, winner, history, lang, T }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
         {kit.captions.map((caption, idx) => (
-          <button key={caption} onClick={() => navigator.clipboard?.writeText(`${caption}\n${shareUrl}`)} style={{ textAlign: "left", padding: "9px 11px", borderRadius: 10, background: "var(--surfaceLight)", border: "1px solid var(--border)", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 12, cursor: "pointer" }}>
+          <button key={caption} onClick={() => copyCaption(caption)} style={{ textAlign: "left", padding: "9px 11px", borderRadius: 10, background: "var(--surfaceLight)", border: "1px solid var(--border)", color: "var(--textDim)", fontFamily: "Outfit,sans-serif", fontSize: 12, cursor: "pointer" }}>
             <span style={{ color: "var(--accentAlt)", fontFamily: "Space Mono,monospace", marginRight: 6 }}>Caption {idx + 1}</span>{caption}
           </button>
         ))}

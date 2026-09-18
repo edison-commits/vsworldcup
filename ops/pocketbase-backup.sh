@@ -87,14 +87,13 @@ tar -tzf "$archive_tmp" >/dev/null
 mv "$archive_tmp" "$archive"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$archive" > "$checksum_tmp"
-  sha256sum -c "$checksum_tmp" >/dev/null
+  archive_digest=$(sha256sum "$archive" | cut -d ' ' -f 1)
 elif command -v shasum >/dev/null 2>&1; then
-  shasum -a 256 "$archive" > "$checksum_tmp"
-  shasum -a 256 -c "$checksum_tmp" >/dev/null
+  archive_digest=$(shasum -a 256 "$archive" | cut -d ' ' -f 1)
 else
   fail 'neither sha256sum nor shasum is available for checksum verification'
 fi
+printf '%s  %s\n' "$archive_digest" "$(basename "$archive")" > "$checksum_tmp"
 mv "$checksum_tmp" "$checksum"
 
 if [ -n "$REMOTE_TARGET" ]; then

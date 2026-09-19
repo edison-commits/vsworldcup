@@ -9,6 +9,20 @@ spec.loader.exec_module(auto)
 
 
 class AutoTournamentTests(unittest.TestCase):
+    def test_generation_payload_declares_supported_entry_count(self):
+        self.assertEqual(
+            auto.build_generation_payload('best ramen'),
+            {'prompt': 'best ramen', 'count': 16},
+        )
+
+    def test_validate_generated_entries_requires_exact_count(self):
+        entries = [{'name': f'Entry {index}'} for index in range(16)]
+        self.assertEqual(auto.validate_generated_entries({'entries': entries}), entries)
+        with self.assertRaisesRegex(ValueError, 'expected exactly 16'):
+            auto.validate_generated_entries({'entries': entries[:-1]})
+        with self.assertRaisesRegex(ValueError, 'expected exactly 16'):
+            auto.validate_generated_entries({'entries': entries + [{'name': 'Extra'}]})
+
     def test_normalize_title_matches_case_punctuation_and_filler_words(self):
         self.assertEqual(auto.normalize_title('Best Studio Ghibli Films'), auto.normalize_title('best studio ghibli films!'))
         self.assertEqual(auto.normalize_title('Greatest Rap Albums Ever'), auto.normalize_title('greatest rap albums'))

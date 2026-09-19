@@ -33,12 +33,15 @@ jobs:
       - name: Install, verify, and build
         run: |
           npm ci
-          npm audit --omit=dev --audit-level=moderate
+          # npm 10's retired quick-audit endpoint returns false
+          # "Invalid package tree" responses; use the supported bulk endpoint.
+          npx --yes npm@11.6.0 audit --omit=dev --audit-level=moderate
           npm test
           node --test server.test.js server/proxy.test.js
           python3 -m unittest ops/auto_tournament_test.py
           python3 -m py_compile ops/auto-tournament.py
           bash -n ops/vsworldcup-healthcheck.sh
+          bash ops/vsworldcup-healthcheck.test.sh
           bash -n ops/pocketbase-backup.sh
           bash -n ops/pocketbase-backup.test.sh
           bash ops/pocketbase-backup.test.sh
@@ -53,6 +56,7 @@ jobs:
             server.js
             server/proxy.js
             ops/auto-tournament.py
+            ops/vsworldcup-healthcheck.sh
 
   deploy:
     needs: build
@@ -70,7 +74,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "dist/build,dist/server.js,dist/server/proxy.js,dist/ops/auto-tournament.py"
+          source: "dist/build,dist/server.js,dist/server/proxy.js,dist/ops/auto-tournament.py,dist/ops/vsworldcup-healthcheck.sh"
           target: /tmp/vsworldcup-release
           strip_components: 1
           rm: true
@@ -87,21 +91,27 @@ jobs:
             test -f /tmp/vsworldcup-release/server.js
             test -f /tmp/vsworldcup-release/server/proxy.js
             test -f /tmp/vsworldcup-release/ops/auto-tournament.py
+            test -f /tmp/vsworldcup-release/ops/vsworldcup-healthcheck.sh
             test -d /tmp/vsworldcup-release/build
             python3 -m py_compile /tmp/vsworldcup-release/ops/auto-tournament.py
+            bash -n /tmp/vsworldcup-release/ops/vsworldcup-healthcheck.sh
             backup_dir="/opt/vsworldcup/deploy-backups/$(date -u +%Y%m%dT%H%M%SZ)-github-${{ github.sha }}"
             mkdir -p "$backup_dir"
             cp -a /opt/vsworldcup/auto-tournament.py "$backup_dir/auto-tournament.py"
-            rollback_auto_tournament() {
+            cp -a /opt/vsworldcup/vsworldcup-healthcheck.sh "$backup_dir/vsworldcup-healthcheck.sh"
+            rollback_ops_scripts() {
               install -m 0755 "$backup_dir/auto-tournament.py" /opt/vsworldcup/auto-tournament.py
+              install -m 0755 "$backup_dir/vsworldcup-healthcheck.sh" /opt/vsworldcup/vsworldcup-healthcheck.sh
             }
-            trap rollback_auto_tournament ERR
+            trap rollback_ops_scripts ERR
             rsync -az --delete /tmp/vsworldcup-release/build/ /opt/vsworldcup/vs-worldcup/build/
             install -m 0644 /tmp/vsworldcup-release/server.js /opt/vsworldcup/vs-worldcup/server.js
             install -m 0644 /tmp/vsworldcup-release/server/proxy.js /opt/vsworldcup/api-proxy/server.js
             install -m 0755 /tmp/vsworldcup-release/ops/auto-tournament.py /opt/vsworldcup/auto-tournament.py
+            install -m 0755 /tmp/vsworldcup-release/ops/vsworldcup-healthcheck.sh /opt/vsworldcup/vsworldcup-healthcheck.sh
             node --check /opt/vsworldcup/api-proxy/server.js
             python3 -m py_compile /opt/vsworldcup/auto-tournament.py
+            bash -n /opt/vsworldcup/vsworldcup-healthcheck.sh
             systemctl restart vsworldcup-api
             systemctl restart vsworldcup
             sleep 3

@@ -7,7 +7,7 @@ These files are source-control candidates for review only. Adding them here does
 ## Scripts
 
 - `auto-tournament.py` — daily local-to-VPS automation that chooses a non-duplicate theme, calls the local API proxy at `http://localhost:3001/api/generate`, validates a 16-entry response, skips duplicate generated titles, and creates the featured PocketBase tournament record.
-- `vsworldcup-healthcheck.sh` — non-mutating healthcheck for local frontend, local API health, and public site availability. It intentionally avoids `POST /api/generate` so healthchecks do not spend tokens or create AI/API load.
+- `vsworldcup-healthcheck.sh` — non-mutating healthcheck for the local frontend/API, public site/status dashboard, auto-tournament freshness, PocketBase stats fallback use, and PocketBase backup age. It uses only GET requests and intentionally avoids `POST /api/generate` so healthchecks do not spend tokens, trigger generation, or create records. Defaults alert after 36 hours without a fresh auto-tournament and 6 hours without a fresh backup; both thresholds are configurable through environment variables.
 - `pocketbase-backup.sh` — source-controlled backup helper candidate. It requires explicit `PB_DATA_DIR` and `BACKUP_DIR`, rejects nested source/destination paths, stages `data.db` through SQLite online backup when present, copies other PocketBase files into a temporary staging directory, writes timestamped `.tar.gz` archives through temporary files plus `.sha256` checksums, verifies checksum/archive listing/restored SQLite integrity in tests, uses a lock directory, and refuses remote copy/prune behavior unless explicitly enabled. It is **not** installed or scheduled by this repo change.
 - `pocketbase-restore-check.sh` — restore-proof helper. It requires an archive and matching `.sha256`, refuses to overwrite an existing restore directory, extracts to a proof directory, runs SQLite `PRAGMA integrity_check` when `data.db` is present, and reports restored file count. Use this after the first approved production snapshot and for periodic restore drills.
 
@@ -17,6 +17,7 @@ These files are source-control candidates for review only. Adding them here does
 python3 -m unittest ops/auto_tournament_test.py
 python3 -m py_compile ops/auto-tournament.py
 bash -n ops/vsworldcup-healthcheck.sh
+bash ops/vsworldcup-healthcheck.test.sh
 bash -n ops/pocketbase-backup.sh
 bash -n ops/pocketbase-restore-check.sh
 bash ops/pocketbase-backup.test.sh

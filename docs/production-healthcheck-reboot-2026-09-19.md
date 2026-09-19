@@ -21,7 +21,7 @@ Default checks:
 - public site: `https://vsworldcup.com`
 - public status dashboard: `https://status.vsworldcup.com` (redirects followed)
 - auto-generation freshness: local read-only `GET /api/stats/auto-tournaments`, using `last_created.created` with an explicitly labeled ID-date fallback, maximum age 36 hours
-- PocketBase fallback: read-only country-winner request plus journal cursor inspection for the existing observable SQLite-fallback warning
+- PocketBase fallback: read-only country-winner request plus journal cursor inspection; a successful route using the designed read-only SQLite fallback is reported as an operational warning, while request or journal failures still fail the healthcheck
 - backup freshness: newest `/opt/vsworldcup/backups/pocketbase/pocketbase-*.tar.gz`, maximum age 6 hours
 
 The script aggregates failures, exits nonzero when any check fails, and emits a final `SUMMARY OK` or `SUMMARY FAIL` line. Local regression coverage exercises healthy output plus status failure, stale generation, fallback activation, stale backup, and the prohibition on `POST`/`/api/generate` in the monitor.

@@ -84,7 +84,7 @@ grep -q 'OK public-status' <<< "$output"
 grep -q 'OK auto-generation-freshness' <<< "$output"
 grep -q 'OK pocketbase-fallback not-observed' <<< "$output"
 grep -q 'OK backup-age' <<< "$output"
-grep -q 'SUMMARY OK failures=0' <<< "$output"
+grep -q 'SUMMARY OK failures=0 warnings=0' <<< "$output"
 
 recent_timestamp_body="{\"ok\":true,\"last_created\":{\"id\":\"auto-$recent_id_date\",\"created\":\"$recent_created\"}}"
 recent_output=$(FAKE_AUTO_BODY="$recent_timestamp_body" run_healthcheck)
@@ -114,11 +114,9 @@ if FAKE_AUTO_BODY="$stale_body" run_healthcheck >"$TMP_DIR/auto.out" 2>"$TMP_DIR
 fi
 grep -q 'FAIL auto-generation-freshness .*max_hours=36' "$TMP_DIR/auto.err"
 
-if FAKE_FALLBACK=1 run_healthcheck >"$TMP_DIR/fallback.out" 2>"$TMP_DIR/fallback.err"; then
-  echo 'expected PocketBase SQLite fallback to fail healthcheck' >&2
-  exit 1
-fi
-grep -q 'FAIL pocketbase-fallback sqlite-fallback-observed' "$TMP_DIR/fallback.err"
+FAKE_FALLBACK=1 run_healthcheck >"$TMP_DIR/fallback.out" 2>"$TMP_DIR/fallback.err"
+grep -q 'WARN pocketbase-fallback sqlite-fallback-observed' "$TMP_DIR/fallback.err"
+grep -q 'SUMMARY OK failures=0 warnings=1' "$TMP_DIR/fallback.out"
 
 python3 - "$BACKUPS/pocketbase-test.tar.gz" <<'PY'
 import os

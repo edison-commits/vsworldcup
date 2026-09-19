@@ -52,6 +52,7 @@ jobs:
             build/
             server.js
             server/proxy.js
+            ops/auto-tournament.py
 
   deploy:
     needs: build
@@ -69,7 +70,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "dist/build,dist/server.js,dist/server/proxy.js"
+          source: "dist/build,dist/server.js,dist/server/proxy.js,dist/ops/auto-tournament.py"
           target: /tmp/vsworldcup-release
           strip_components: 1
           rm: true
@@ -85,11 +86,17 @@ jobs:
             set -euo pipefail
             test -f /tmp/vsworldcup-release/server.js
             test -f /tmp/vsworldcup-release/server/proxy.js
+            test -f /tmp/vsworldcup-release/ops/auto-tournament.py
             test -d /tmp/vsworldcup-release/build
+            backup_dir="/opt/vsworldcup/deploy-backups/$(date -u +%Y%m%dT%H%M%SZ)-github-${{ github.sha }}"
+            mkdir -p "$backup_dir"
+            cp -a /opt/vsworldcup/auto-tournament.py "$backup_dir/auto-tournament.py"
             rsync -az --delete /tmp/vsworldcup-release/build/ /opt/vsworldcup/vs-worldcup/build/
             install -m 0644 /tmp/vsworldcup-release/server.js /opt/vsworldcup/vs-worldcup/server.js
             install -m 0644 /tmp/vsworldcup-release/server/proxy.js /opt/vsworldcup/api-proxy/server.js
+            install -m 0755 /tmp/vsworldcup-release/ops/auto-tournament.py /opt/vsworldcup/auto-tournament.py
             node --check /opt/vsworldcup/api-proxy/server.js
+            python3 -m py_compile /opt/vsworldcup/auto-tournament.py
             systemctl restart vsworldcup-api
             systemctl restart vsworldcup
             sleep 3

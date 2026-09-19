@@ -4,6 +4,7 @@ import json, urllib.request, datetime, random, sys, re
 
 API_URL = "http://localhost:3001/api/collections/tournaments/records"
 PROXY_URL = "http://localhost:3001/api/generate"
+GENERATED_ENTRY_COUNT = 16
 
 def log(msg):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -24,6 +25,19 @@ def available_themes(themes, recent_titles):
 
 def is_duplicate_title(title, recent_titles):
     return normalize_title(title) in {normalize_title(existing) for existing in recent_titles}
+
+def build_generation_payload(prompt):
+    """Build the proxy request using its explicit, validated count contract."""
+    return {"prompt": prompt, "count": GENERATED_ENTRY_COUNT}
+
+def validate_generated_entries(tournament):
+    """Reject partial or oversized generations instead of silently truncating them."""
+    entries = tournament.get("entries", [])
+    if len(entries) != GENERATED_ENTRY_COUNT:
+        raise ValueError(
+            f"expected exactly {GENERATED_ENTRY_COUNT} generated entries, got {len(entries)}"
+        )
+    return entries
 
 def fetch_json(url, timeout=10):
     req = urllib.request.Request(url)
@@ -165,15 +179,14 @@ def generate_tournament():
 
     try:
         log(f"Generating tournament: {theme}")
-        data = json.dumps({"prompt": prompt}).encode()
+        data = json.dumps(build_generation_payload(prompt)).encode()
         req = urllib.request.Request(PROXY_URL, data=data, headers={"Content-Type":"application/json"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             tournament = json.loads(resp.read().decode())
         
-        num_entries = len(tournament.get('entries', []))
+        entries = validate_generated_entries(tournament)
+        num_entries = len(entries)
         log(f"Success: got {num_entries} entries from proxy")
-        if num_entries < 16:
-            raise ValueError(f"generated tournament only had {num_entries} entries")
         if is_duplicate_title(tournament.get("title", ""), recent_titles):
             log(f"Skipping duplicate generated title: {tournament.get('title')}")
             return
@@ -194,7 +207,7 @@ def generate_tournament():
                     "snippetType": "tagline",
                     "img": ""
                 }
-                for e in tournament.get("entries", [])[:16]
+                for e in entries
             ]
         }
         

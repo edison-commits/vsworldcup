@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 log() {
   printf '[pocketbase-backup] %s\n' "$*"
@@ -68,18 +69,62 @@ log "source=$PB_DATA_DIR"
 log "destination=$archive"
 
 command -v rsync >/dev/null 2>&1 || fail 'rsync is required to stage PocketBase storage files'
+command -v python3 >/dev/null 2>&1 || fail 'python3 is required to create consistent SQLite backups'
 mkdir -p "$staging_dir"
 
-if [ -f "$pb_data_resolved/data.db" ]; then
-  command -v sqlite3 >/dev/null 2>&1 || fail 'sqlite3 is required to create a consistent data.db backup'
-  log 'sqlite-online-backup=data.db'
-  sqlite3 "$pb_data_resolved/data.db" ".backup '$staging_dir/data.db'"
-  integrity=$(sqlite3 "$staging_dir/data.db" 'PRAGMA integrity_check;')
-  [ "$integrity" = 'ok' ] || fail "staged SQLite integrity_check failed: $integrity"
-  rsync -a --exclude '/data.db' -- "$pb_data_resolved/" "$staging_dir/"
-else
-  rsync -a -- "$pb_data_resolved/" "$staging_dir/"
+while IFS= read -r -d '' source_db; do
+  db_name=$(basename "$source_db")
+  staged_db="$staging_dir/$db_name"
+  if [ ! -s "$source_db" ]; then
+    cp -a -- "$source_db" "$staged_db"
+    log "sqlite-empty-file-copy=$db_name"
+    continue
+  fi
+
+  log "sqlite-online-backup=$db_name"
+  python3 - "$source_db" "$staged_db" <<'PY'
+import sqlite3
+import sys
+
+source_path, destination_path = sys.argv[1:]
+source = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True)
+destination = sqlite3.connect(destination_path)
+try:
+    source.backup(destination)
+    result = destination.execute("PRAGMA integrity_check").fetchone()
+    if result != ("ok",):
+        raise SystemExit(f"staged SQLite integrity_check failed for {source_path}: {result}")
+    destination.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    journal_mode = destination.execute("PRAGMA journal_mode=DELETE").fetchone()
+    if not journal_mode or journal_mode[0].lower() != "delete":
+        raise SystemExit(
+            f"could not normalize staged SQLite journal mode for {source_path}: {journal_mode}"
+        )
+finally:
+    destination.close()
+    source.close()
+
+for suffix in ("-wal", "-shm"):
+    sidecar = destination_path + suffix
+    try:
+        import os
+        os.unlink(sidecar)
+    except FileNotFoundError:
+        pass
+PY
+done < <(find "$pb_data_resolved" -maxdepth 1 -type f -name '*.db' -print0)
+
+if find "$staging_dir" -maxdepth 1 -type f \( -name '*.db-wal' -o -name '*.db-shm' \) -print -quit | grep -q .; then
+  fail 'staged SQLite WAL/SHM sidecars remain after journal normalization'
 fi
+
+# SQLite online backup folds committed WAL content into each staged database.
+# Copying live WAL/SHM sidecars afterward could make the snapshot inconsistent.
+rsync -a \
+  --exclude '/*.db' \
+  --exclude '/*.db-wal' \
+  --exclude '/*.db-shm' \
+  -- "$pb_data_resolved/" "$staging_dir/"
 
 tar -czf "$archive_tmp" -C "$staging_parent" "$source_base"
 [ -s "$archive_tmp" ] || fail "archive was not created or is empty: $archive_tmp"

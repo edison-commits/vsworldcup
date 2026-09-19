@@ -88,9 +88,14 @@ jobs:
             test -f /tmp/vsworldcup-release/server/proxy.js
             test -f /tmp/vsworldcup-release/ops/auto-tournament.py
             test -d /tmp/vsworldcup-release/build
+            python3 -m py_compile /tmp/vsworldcup-release/ops/auto-tournament.py
             backup_dir="/opt/vsworldcup/deploy-backups/$(date -u +%Y%m%dT%H%M%SZ)-github-${{ github.sha }}"
             mkdir -p "$backup_dir"
             cp -a /opt/vsworldcup/auto-tournament.py "$backup_dir/auto-tournament.py"
+            rollback_auto_tournament() {
+              install -m 0755 "$backup_dir/auto-tournament.py" /opt/vsworldcup/auto-tournament.py
+            }
+            trap rollback_auto_tournament ERR
             rsync -az --delete /tmp/vsworldcup-release/build/ /opt/vsworldcup/vs-worldcup/build/
             install -m 0644 /tmp/vsworldcup-release/server.js /opt/vsworldcup/vs-worldcup/server.js
             install -m 0644 /tmp/vsworldcup-release/server/proxy.js /opt/vsworldcup/api-proxy/server.js
@@ -102,3 +107,4 @@ jobs:
             sleep 3
             systemctl is-active vsworldcup-api
             systemctl is-active vsworldcup
+            trap - ERR

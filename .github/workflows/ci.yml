@@ -22,7 +22,10 @@ jobs:
         run: npm ci
 
       - name: Audit production dependency surface
-        run: npm audit --omit=dev --audit-level=moderate
+        # npm 10's legacy quick-audit endpoint is being retired and returns
+        # false "Invalid package tree" responses. Pin npm 11 so the audit uses
+        # the supported bulk advisory endpoint while remaining fail-closed.
+        run: npx --yes npm@11.6.0 audit --omit=dev --audit-level=moderate
 
       - name: Frontend tests
         run: npm test
@@ -40,6 +43,8 @@ jobs:
         run: |
           python3 -m py_compile ops/auto-tournament.py
           bash -n ops/vsworldcup-healthcheck.sh
+          bash -n ops/vsworldcup-healthcheck.test.sh
+          bash ops/vsworldcup-healthcheck.test.sh
           bash -n ops/pocketbase-backup.sh
           bash -n ops/pocketbase-backup.test.sh
           bash -n ops/pocketbase-restore-check.sh

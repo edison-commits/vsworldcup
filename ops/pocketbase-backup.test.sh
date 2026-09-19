@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 SCRIPT="$ROOT_DIR/ops/pocketbase-backup.sh"
+RESTORE_SCRIPT="$ROOT_DIR/ops/pocketbase-restore-check.sh"
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t pb-backup-test)
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -13,16 +14,38 @@ PB_FAKE="$TMP_DIR/pb_data"
 BACKUPS="$TMP_DIR/backups"
 mkdir -p "$PB_FAKE/storage/images" "$PB_FAKE/backups"
 sqlite3 "$PB_FAKE/data.db" "CREATE TABLE smoke (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO smoke (value) VALUES ('fake sqlite row');"
+sqlite3 "$PB_FAKE/auxiliary.db" "CREATE TABLE analytics (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO analytics (value) VALUES ('fake auxiliary row');"
+for special_name in 'metrics?2026.db' 'metrics#2026.db' 'metrics%2026.db'; do
+  sqlite3 "$PB_FAKE/$special_name" "CREATE TABLE special (value TEXT NOT NULL); INSERT INTO special VALUES ('$special_name');"
+done
+printf 'live wal must not be copied\n' > "$PB_FAKE/auxiliary.db-wal"
+printf 'live shm must not be copied\n' > "$PB_FAKE/auxiliary.db-shm"
 printf 'fake image bytes\n' > "$PB_FAKE/storage/images/example.txt"
+printf 'opaque storage object with a database-looking suffix\n' > "$PB_FAKE/storage/images/manual.db"
 
 output=$(PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$BACKUPS" bash "$SCRIPT")
 printf '%s\n' "$output"
 grep -q 'sqlite-online-backup=data.db' <<< "$output"
+grep -q 'sqlite-online-backup=auxiliary.db' <<< "$output"
+grep -q 'sqlite-online-backup=metrics?2026.db' <<< "$output"
+grep -q 'sqlite-online-backup=metrics#2026.db' <<< "$output"
+grep -q 'sqlite-online-backup=metrics%2026.db' <<< "$output"
+[ ! -e "$PB_FAKE/metrics" ] || { echo 'backup URI parsing mutated the live source directory' >&2; exit 1; }
 
 archive=$(find "$BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' | sort | tail -1)
 [ -n "$archive" ] || { echo 'expected archive file' >&2; exit 1; }
 [ -s "$archive" ] || { echo 'archive is empty' >&2; exit 1; }
 [ -f "$archive.sha256" ] || { echo 'expected checksum file' >&2; exit 1; }
+
+file_mode() {
+  if stat -f '%Lp' "$1" >/dev/null 2>&1; then
+    stat -f '%Lp' "$1"
+  else
+    stat -c '%a' "$1"
+  fi
+}
+[ "$(file_mode "$archive")" = '600' ] || { echo 'expected archive mode 600' >&2; exit 1; }
+[ "$(file_mode "$archive.sha256")" = '600' ] || { echo 'expected checksum mode 600' >&2; exit 1; }
 
 recorded_archive=$(cut -d ' ' -f 3- "$archive.sha256")
 [ "$recorded_archive" = "$(basename "$archive")" ] || {
@@ -37,7 +60,12 @@ else
 fi
 
 tar -tzf "$archive" | grep -q '^pb_data/data.db$'
+tar -tzf "$archive" | grep -q '^pb_data/auxiliary.db$'
 tar -tzf "$archive" | grep -q '^pb_data/storage/images/example.txt$'
+if tar -tzf "$archive" | grep -Eq '^pb_data/.*\.db-(wal|shm)$'; then
+  echo 'expected live SQLite WAL/SHM sidecars to be excluded after online backup' >&2
+  exit 1
+fi
 
 RESTORE_DIR="$TMP_DIR/restore"
 mkdir -p "$RESTORE_DIR"
@@ -48,16 +76,293 @@ restored_integrity=$(sqlite3 "$RESTORE_DIR/pb_data/data.db" 'PRAGMA integrity_ch
 [ "$restored_integrity" = 'ok' ] || { echo "expected restored SQLite integrity ok, got: $restored_integrity" >&2; exit 1; }
 restored_value=$(sqlite3 "$RESTORE_DIR/pb_data/data.db" "SELECT value FROM smoke WHERE id = 1;")
 [ "$restored_value" = 'fake sqlite row' ] || { echo "expected restored sqlite row, got: $restored_value" >&2; exit 1; }
+restored_aux_integrity=$(sqlite3 "$RESTORE_DIR/pb_data/auxiliary.db" 'PRAGMA integrity_check;')
+[ "$restored_aux_integrity" = 'ok' ] || { echo "expected restored auxiliary SQLite integrity ok, got: $restored_aux_integrity" >&2; exit 1; }
+restored_aux_value=$(sqlite3 "$RESTORE_DIR/pb_data/auxiliary.db" "SELECT value FROM analytics WHERE id = 1;")
+[ "$restored_aux_value" = 'fake auxiliary row' ] || { echo "expected restored auxiliary row, got: $restored_aux_value" >&2; exit 1; }
+for special_name in 'metrics?2026.db' 'metrics#2026.db' 'metrics%2026.db'; do
+  special_value=$(sqlite3 "$RESTORE_DIR/pb_data/$special_name" 'SELECT value FROM special;')
+  [ "$special_value" = "$special_name" ] || { echo "special SQLite filename round trip failed: $special_name" >&2; exit 1; }
+done
 cmp "$PB_FAKE/storage/images/example.txt" "$RESTORE_DIR/pb_data/storage/images/example.txt"
+cmp "$PB_FAKE/storage/images/manual.db" "$RESTORE_DIR/pb_data/storage/images/manual.db"
 
-if find "$BACKUPS" -maxdepth 1 \( -type f -o -type d \) -name '*.tmp.*' | grep -q .; then
-  echo 'expected no temporary archive/checksum/staging files after successful backup' >&2
+CHECKED_RESTORE="$TMP_DIR/checked-restore"
+ARCHIVE="$archive" RESTORE_DIR="$CHECKED_RESTORE" bash "$RESTORE_SCRIPT" >/dev/null
+[ -f "$CHECKED_RESTORE/pb_data/storage/images/manual.db" ] || { echo 'restore checker rejected or lost opaque nested .db storage object' >&2; exit 1; }
+
+CUSTOM_SOURCE="$TMP_DIR/custom-data"
+CUSTOM_BACKUPS="$TMP_DIR/custom-backups"
+CUSTOM_RESTORE="$TMP_DIR/custom-restore"
+mkdir -p "$CUSTOM_SOURCE/storage" "$CUSTOM_BACKUPS"
+sqlite3 "$CUSTOM_SOURCE/data.db" "CREATE TABLE custom_smoke (value TEXT NOT NULL); INSERT INTO custom_smoke VALUES ('custom root');"
+printf 'custom storage\n' > "$CUSTOM_SOURCE/storage/object.txt"
+PB_DATA_DIR="$CUSTOM_SOURCE" BACKUP_DIR="$CUSTOM_BACKUPS" bash "$SCRIPT" >/dev/null
+custom_archive=$(find "$CUSTOM_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)
+[ -n "$custom_archive" ] || { echo 'expected custom-source archive' >&2; exit 1; }
+tar -tzf "$custom_archive" | grep -q '^pb_data/data.db$'
+ARCHIVE="$custom_archive" RESTORE_DIR="$CUSTOM_RESTORE" bash "$RESTORE_SCRIPT" >/dev/null
+[ "$(sqlite3 "$CUSTOM_RESTORE/pb_data/data.db" 'SELECT value FROM custom_smoke;')" = 'custom root' ] || { echo 'custom-source round trip failed' >&2; exit 1; }
+
+# Keep a real WAL-mode writer open while the helper runs. The staged database
+# must retain the committed row while the archive remains sidecar-free.
+WAL_SOURCE="$TMP_DIR/wal-case/pb_data"
+WAL_BACKUPS="$TMP_DIR/wal-backups"
+mkdir -p "$WAL_SOURCE" "$WAL_BACKUPS"
+python3 - "$SCRIPT" "$WAL_SOURCE" "$WAL_BACKUPS" <<'PY'
+import io
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+script, source_dir, backup_dir = sys.argv[1:]
+database = Path(source_dir) / "data.db"
+connection = sqlite3.connect(database)
+try:
+    assert connection.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower() == "wal"
+    connection.execute("PRAGMA wal_autocheckpoint=0")
+    connection.execute("CREATE TABLE wal_smoke (value TEXT NOT NULL)")
+    connection.execute("INSERT INTO wal_smoke VALUES ('committed in wal')")
+    connection.commit()
+    assert Path(str(database) + "-wal").exists()
+
+    env = os.environ.copy()
+    env.update(PB_DATA_DIR=source_dir, BACKUP_DIR=backup_dir)
+    subprocess.run(["bash", script], env=env, check=True, capture_output=True, text=True)
+
+    archive = sorted(Path(backup_dir).glob("pocketbase-*.tar.gz"))[-1]
+    with tarfile.open(archive, "r:gz") as tar:
+        names = tar.getnames()
+        assert not any(name.endswith((".db-wal", ".db-shm")) for name in names), names
+        member = tar.getmember("pb_data/data.db")
+        restored_bytes = tar.extractfile(member).read()
+    with tempfile.NamedTemporaryFile(suffix=".db") as restored:
+        restored.write(restored_bytes)
+        restored.flush()
+        check = sqlite3.connect(restored.name)
+        try:
+            assert check.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+            assert check.execute("SELECT value FROM wal_smoke").fetchone() == ("committed in wal",)
+        finally:
+            check.close()
+finally:
+    connection.close()
+PY
+
+if find "$BACKUPS" -maxdepth 1 \( -name '.pocketbase-archive.*' -o -name '.pocketbase-checksum.*' -o -name '.pocketbase-backup-staging.*' \) -print -quit | grep -q .; then
+  echo 'expected no temporary archive/checksum/staging paths after successful backup' >&2
   exit 1
 fi
-if find "$BACKUPS" -maxdepth 1 -type d -name '.pocketbase-backup-staging.*' | grep -q .; then
-  echo 'expected no temporary staging directories after successful backup' >&2
+
+EMPTY_SOURCE="$TMP_DIR/empty-source"
+EMPTY_BACKUPS="$TMP_DIR/empty-backups"
+mkdir -p "$EMPTY_SOURCE/storage" "$EMPTY_BACKUPS"
+if PB_DATA_DIR="$EMPTY_SOURCE" BACKUP_DIR="$EMPTY_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/empty-backup.out" 2>"$TMP_DIR/empty-backup.err"; then
+  echo 'expected file-empty PocketBase source to fail before publication' >&2
   exit 1
 fi
+grep -q 'staged PocketBase snapshot contains no regular files' "$TMP_DIR/empty-backup.err"
+[ -z "$(find "$EMPTY_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'empty source published an archive' >&2; exit 1; }
+[ -z "$(find "$EMPTY_BACKUPS" -maxdepth 1 \( -name '.pocketbase-archive.*' -o -name '.pocketbase-checksum.*' -o -name '.pocketbase-backup-staging.*' \) -print -quit)" ] || { echo 'ordinary backup failure leaked owned temporary paths' >&2; exit 1; }
+
+PREDICTABLE_BACKUPS="$TMP_DIR/predictable-staging-backups"
+mkdir -p "$PREDICTABLE_BACKUPS"
+if SCRIPT="$SCRIPT" PB_DATA_DIR="$EMPTY_SOURCE" BACKUP_DIR="$PREDICTABLE_BACKUPS" bash -c '
+  staging="$BACKUP_DIR/.pocketbase-backup-staging.$$/pb_data"
+  mkdir -p "$staging"
+  printf "foreign marker\n" > "$staging/injected.txt"
+  exec bash "$SCRIPT"
+' >"$TMP_DIR/predictable-staging.out" 2>"$TMP_DIR/predictable-staging.err"; then
+  echo 'expected empty source with a colliding foreign staging directory to fail' >&2
+  exit 1
+fi
+foreign_staging=$(find "$PREDICTABLE_BACKUPS" -maxdepth 1 -type d -name '.pocketbase-backup-staging.*' -print -quit)
+[ -n "$foreign_staging" ] || { echo 'backup deleted a staging directory it did not create' >&2; exit 1; }
+[ "$(cat "$foreign_staging/pb_data/injected.txt")" = 'foreign marker' ] || { echo 'backup modified foreign staging content' >&2; exit 1; }
+[ -z "$(find "$PREDICTABLE_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'foreign staging content was published' >&2; exit 1; }
+
+SYMLINK_SOURCE="$TMP_DIR/symlink-source"
+SYMLINK_BACKUPS="$TMP_DIR/symlink-backups"
+mkdir -p "$SYMLINK_SOURCE/storage" "$SYMLINK_BACKUPS"
+printf 'regular storage object\n' > "$SYMLINK_SOURCE/storage/target.txt"
+ln -s target.txt "$SYMLINK_SOURCE/storage/link.txt"
+if PB_DATA_DIR="$SYMLINK_SOURCE" BACKUP_DIR="$SYMLINK_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/storage-symlink.out" 2>"$TMP_DIR/storage-symlink.err"; then
+  echo 'expected a storage symlink to fail before publication' >&2
+  exit 1
+fi
+grep -q 'unsupported source filesystem entry' "$TMP_DIR/storage-symlink.err"
+[ -z "$(find "$SYMLINK_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'storage symlink was published' >&2; exit 1; }
+
+SYMLINK_DB_SOURCE="$TMP_DIR/symlink-db-source"
+SYMLINK_DB_BACKUPS="$TMP_DIR/symlink-db-backups"
+mkdir -p "$SYMLINK_DB_SOURCE/storage" "$SYMLINK_DB_BACKUPS"
+sqlite3 "$TMP_DIR/real-data.db" 'CREATE TABLE real_data (value TEXT);'
+ln -s "$TMP_DIR/real-data.db" "$SYMLINK_DB_SOURCE/data.db"
+printf 'storage object\n' > "$SYMLINK_DB_SOURCE/storage/object.txt"
+if PB_DATA_DIR="$SYMLINK_DB_SOURCE" BACKUP_DIR="$SYMLINK_DB_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/db-symlink.out" 2>"$TMP_DIR/db-symlink.err"; then
+  echo 'expected a symlinked top-level database to fail before publication' >&2
+  exit 1
+fi
+grep -q 'unsupported source filesystem entry' "$TMP_DIR/db-symlink.err"
+[ -z "$(find "$SYMLINK_DB_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'symlinked database source was published without data.db' >&2; exit 1; }
+
+ROOT_SYMLINK="$TMP_DIR/root-pb-data-link"
+ROOT_SYMLINK_BACKUPS="$TMP_DIR/root-symlink-backups"
+ln -s "$PB_FAKE" "$ROOT_SYMLINK"
+mkdir -p "$ROOT_SYMLINK_BACKUPS"
+root_variant_index=0
+for root_variant in "$ROOT_SYMLINK" "$ROOT_SYMLINK/" "$ROOT_SYMLINK/."; do
+  root_variant_index=$((root_variant_index + 1))
+  if PB_DATA_DIR="$root_variant" BACKUP_DIR="$ROOT_SYMLINK_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/root-symlink-$root_variant_index.out" 2>"$TMP_DIR/root-symlink-$root_variant_index.err"; then
+    echo "expected symlinked PB_DATA_DIR root spelling to fail before publication: $root_variant" >&2
+    exit 1
+  fi
+  grep -q 'PB_DATA_DIR itself must not be a symbolic link' "$TMP_DIR/root-symlink-$root_variant_index.err"
+done
+[ -z "$(find "$ROOT_SYMLINK_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'symlinked source root was published' >&2; exit 1; }
+
+LATE_LINK_SOURCE="$TMP_DIR/late-link-source"
+LATE_LINK_BACKUPS="$TMP_DIR/late-link-backups"
+LATE_LINK_WRAPPER="$TMP_DIR/late-link-wrapper"
+mkdir -p "$LATE_LINK_SOURCE/storage" "$LATE_LINK_BACKUPS" "$LATE_LINK_WRAPPER"
+printf 'regular storage\n' > "$LATE_LINK_SOURCE/storage/object.txt"
+real_rsync=$(command -v rsync)
+cat > "$LATE_LINK_WRAPPER/rsync" <<'SH'
+#!/bin/sh
+set -eu
+if [ ! -e "$LATE_LINK_SOURCE/storage/late-link" ] && [ ! -L "$LATE_LINK_SOURCE/storage/late-link" ]; then
+  ln -s object.txt "$LATE_LINK_SOURCE/storage/late-link"
+fi
+exec "$REAL_RSYNC" "$@"
+SH
+chmod 0755 "$LATE_LINK_WRAPPER/rsync"
+if REAL_RSYNC="$real_rsync" LATE_LINK_SOURCE="$LATE_LINK_SOURCE" PATH="$LATE_LINK_WRAPPER:$PATH" PB_DATA_DIR="$LATE_LINK_SOURCE" BACKUP_DIR="$LATE_LINK_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/late-link.out" 2>"$TMP_DIR/late-link.err"; then
+  echo 'expected a source symlink added after preflight to fail before publication' >&2
+  exit 1
+fi
+grep -q 'unsupported staged filesystem entry' "$TMP_DIR/late-link.err"
+[ -z "$(find "$LATE_LINK_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'late source symlink was published' >&2; exit 1; }
+
+STAGING_REPLACEMENT_BACKUPS="$TMP_DIR/staging-replacement-backups"
+STAGING_REPLACEMENT_WRAPPER="$TMP_DIR/staging-replacement-wrapper"
+mkdir -p "$STAGING_REPLACEMENT_BACKUPS" "$STAGING_REPLACEMENT_WRAPPER"
+cat > "$STAGING_REPLACEMENT_WRAPPER/tar" <<'SH'
+#!/bin/sh
+set -eu
+staging=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name '.pocketbase-backup-staging.*' -print -quit)
+mv "$staging" "$BACKUP_DIR/.owned-staging-original"
+mkdir "$staging"
+printf 'foreign staging replacement\n' > "$staging/marker.txt"
+exit 99
+SH
+chmod 0755 "$STAGING_REPLACEMENT_WRAPPER/tar"
+if PATH="$STAGING_REPLACEMENT_WRAPPER:$PATH" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$STAGING_REPLACEMENT_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/staging-replacement.out" 2>"$TMP_DIR/staging-replacement.err"; then
+  echo 'expected injected failure after staging replacement' >&2
+  exit 1
+fi
+staging_marker=$(find "$STAGING_REPLACEMENT_BACKUPS" -type f -name marker.txt -print -quit)
+[ -n "$staging_marker" ] || { echo 'backup cleanup deleted a replacement staging directory it did not own' >&2; exit 1; }
+[ "$(cat "$staging_marker")" = 'foreign staging replacement' ] || { echo 'backup modified replacement staging content' >&2; exit 1; }
+
+COLLISION_BACKUPS="$TMP_DIR/collision-backups"
+DATE_WRAPPER="$TMP_DIR/date-wrapper"
+mkdir -p "$COLLISION_BACKUPS" "$DATE_WRAPPER"
+cat > "$DATE_WRAPPER/date" <<'SH'
+#!/bin/sh
+printf '20260919T120000Z\n'
+SH
+chmod 0755 "$DATE_WRAPPER/date"
+PATH="$DATE_WRAPPER:$PATH" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$COLLISION_BACKUPS" bash "$SCRIPT" >/dev/null
+collision_archive="$COLLISION_BACKUPS/pocketbase-20260919T120000Z.tar.gz"
+[ -f "$collision_archive" ] || { echo 'expected fixed-timestamp archive' >&2; exit 1; }
+before_collision_hash=$(shasum -a 256 "$collision_archive" | cut -d ' ' -f 1)
+before_checksum_hash=$(shasum -a 256 "$collision_archive.sha256" | cut -d ' ' -f 1)
+sqlite3 "$PB_FAKE/data.db" "INSERT INTO smoke (value) VALUES ('second snapshot must not clobber first');"
+if PATH="$DATE_WRAPPER:$PATH" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$COLLISION_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/collision.out" 2>"$TMP_DIR/collision.err"; then
+  echo 'expected same-timestamp backup collision to fail closed' >&2
+  exit 1
+fi
+grep -q 'backup archive already exists; refusing to overwrite' "$TMP_DIR/collision.err"
+[ "$(shasum -a 256 "$collision_archive" | cut -d ' ' -f 1)" = "$before_collision_hash" ] || { echo 'existing archive was clobbered' >&2; exit 1; }
+[ "$(shasum -a 256 "$collision_archive.sha256" | cut -d ' ' -f 1)" = "$before_checksum_hash" ] || { echo 'existing checksum was clobbered' >&2; exit 1; }
+
+OWNERSHIP_BACKUPS="$TMP_DIR/ownership-backups"
+OWNERSHIP_WRAPPER="$TMP_DIR/ownership-wrapper"
+mkdir -p "$OWNERSHIP_BACKUPS" "$OWNERSHIP_WRAPPER"
+ownership_archive="$OWNERSHIP_BACKUPS/pocketbase-20260919T130000Z.tar.gz"
+printf 'foreign checksum\n' > "$ownership_archive.sha256"
+cat > "$OWNERSHIP_WRAPPER/date" <<'SH'
+#!/bin/sh
+printf '20260919T130000Z\n'
+SH
+cat > "$OWNERSHIP_WRAPPER/sitecustomize.py" <<'PY'
+import os
+
+_real_link = os.link
+def replacing_link(source, destination, *args, **kwargs):
+    result = _real_link(source, destination, *args, **kwargs)
+    if str(destination).endswith('.tar.gz'):
+        os.unlink(destination)
+        with open(destination, 'w', encoding='utf-8') as handle:
+            handle.write('foreign replacement\n')
+    return result
+os.link = replacing_link
+PY
+chmod 0755 "$OWNERSHIP_WRAPPER/date"
+if PYTHONPATH="$OWNERSHIP_WRAPPER" PATH="$OWNERSHIP_WRAPPER:$PATH" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$OWNERSHIP_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/ownership.out" 2>"$TMP_DIR/ownership.err"; then
+  echo 'expected checksum collision after archive replacement to fail' >&2
+  exit 1
+fi
+ownership_replacement=$(find "$OWNERSHIP_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-20260919T130000Z.tar.gz.retained.*' -print -quit)
+[ -n "$ownership_replacement" ] || { echo 'backup rollback deleted a replacement archive it did not own' >&2; exit 1; }
+[ "$(cat "$ownership_replacement")" = 'foreign replacement' ] || { echo 'backup rollback modified a replacement archive it did not own' >&2; exit 1; }
+[ "$(cat "$ownership_archive.sha256")" = 'foreign checksum' ] || { echo 'backup modified the colliding checksum' >&2; exit 1; }
+
+TEMP_OWNERSHIP_BACKUPS="$TMP_DIR/temp-ownership-backups"
+TEMP_OWNERSHIP_WRAPPER="$TMP_DIR/temp-ownership-wrapper"
+mkdir -p "$TEMP_OWNERSHIP_BACKUPS" "$TEMP_OWNERSHIP_WRAPPER"
+cat > "$TEMP_OWNERSHIP_WRAPPER/sitecustomize.py" <<'PY'
+import os
+
+_real_link = os.link
+def replacing_temp_then_failing(source, destination, *args, **kwargs):
+    if '.pocketbase-archive.' in str(source):
+        os.unlink(source)
+        with open(source, 'w', encoding='utf-8') as handle:
+            handle.write('foreign temporary replacement\n')
+        raise RuntimeError('injected publication failure after temporary replacement')
+    return _real_link(source, destination, *args, **kwargs)
+os.link = replacing_temp_then_failing
+PY
+if PYTHONPATH="$TEMP_OWNERSHIP_WRAPPER" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$TEMP_OWNERSHIP_BACKUPS" bash "$SCRIPT" >"$TMP_DIR/temp-ownership.out" 2>"$TMP_DIR/temp-ownership.err"; then
+  echo 'expected injected publication failure after temporary replacement' >&2
+  exit 1
+fi
+foreign_temp=$(find "$TEMP_OWNERSHIP_BACKUPS" -maxdepth 1 -type f -name '.pocketbase-archive.*' -print -quit)
+[ -n "$foreign_temp" ] || { echo 'backup failure cleanup deleted a replacement temporary it did not own' >&2; exit 1; }
+[ "$(cat "$foreign_temp")" = 'foreign temporary replacement' ] || { echo 'backup modified replacement temporary content' >&2; exit 1; }
+
+PUBLICATION_BACKUPS="$TMP_DIR/publication-backups"
+PUBLICATION_WRAPPER="$TMP_DIR/publication-wrapper"
+mkdir -p "$PUBLICATION_BACKUPS" "$PUBLICATION_WRAPPER"
+real_mv=$(command -v mv)
+cat > "$PUBLICATION_WRAPPER/mv" <<'SH'
+#!/bin/sh
+set -eu
+eval "destination=\${$#}"
+if [ -e "$destination" ]; then
+  echo "publication attempted to overwrite an existing path: $destination" >&2
+  exit 97
+fi
+exec "$REAL_MV" "$@"
+SH
+chmod 0755 "$PUBLICATION_WRAPPER/mv"
+REAL_MV="$real_mv" PATH="$PUBLICATION_WRAPPER:$PATH" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$PUBLICATION_BACKUPS" bash "$SCRIPT" >/dev/null
+[ -n "$(find "$PUBLICATION_BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' -print -quit)" ] || { echo 'expected atomic no-clobber publication to succeed' >&2; exit 1; }
 
 if PB_DATA_DIR="$TMP_DIR/missing" BACKUP_DIR="$BACKUPS" bash "$SCRIPT" >/tmp/pocketbase-backup-missing.out 2>/tmp/pocketbase-backup-missing.err; then
   echo 'expected missing PB_DATA_DIR to fail' >&2
@@ -105,5 +410,27 @@ if PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$LOCKED_BACKUPS" bash "$SCRIPT" >/tmp/pock
   exit 1
 fi
 grep -q 'another backup appears to be running' /tmp/pocketbase-backup-locked.err
+
+LOCK_REPLACEMENT_BACKUPS="$TMP_DIR/lock-replacement-backups"
+LOCK_REPLACEMENT_WRAPPER="$TMP_DIR/lock-replacement-wrapper"
+mkdir -p "$LOCK_REPLACEMENT_BACKUPS" "$LOCK_REPLACEMENT_WRAPPER"
+real_tar=$(command -v tar)
+cat > "$LOCK_REPLACEMENT_WRAPPER/tar" <<'SH'
+#!/bin/sh
+set -eu
+lock="$BACKUP_DIR/.pocketbase-backup.lock"
+if [ ! -f "$BACKUP_DIR/.lock-replaced" ]; then
+  mv "$lock" "$BACKUP_DIR/.owned-lock-original"
+  mkdir "$lock"
+  printf 'foreign lock marker\n' > "$lock/marker.txt"
+  : > "$BACKUP_DIR/.lock-replaced"
+fi
+exec "$REAL_TAR" "$@"
+SH
+chmod 0755 "$LOCK_REPLACEMENT_WRAPPER/tar"
+REAL_TAR="$real_tar" PATH="$LOCK_REPLACEMENT_WRAPPER:$PATH" PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$LOCK_REPLACEMENT_BACKUPS" bash "$SCRIPT" >/dev/null
+lock_marker=$(find "$LOCK_REPLACEMENT_BACKUPS" -type f -name marker.txt -print -quit)
+[ -n "$lock_marker" ] || { echo 'backup cleanup deleted a replacement lock directory it did not own' >&2; exit 1; }
+[ "$(cat "$lock_marker")" = 'foreign lock marker' ] || { echo 'backup modified replacement lock content' >&2; exit 1; }
 
 echo 'pocketbase-backup.test.sh: OK'

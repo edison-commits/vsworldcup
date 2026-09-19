@@ -13,16 +13,30 @@ PB_FAKE="$TMP_DIR/pb_data"
 BACKUPS="$TMP_DIR/backups"
 mkdir -p "$PB_FAKE/storage/images" "$PB_FAKE/backups"
 sqlite3 "$PB_FAKE/data.db" "CREATE TABLE smoke (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO smoke (value) VALUES ('fake sqlite row');"
+sqlite3 "$PB_FAKE/auxiliary.db" "CREATE TABLE analytics (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO analytics (value) VALUES ('fake auxiliary row');"
+printf 'live wal must not be copied\n' > "$PB_FAKE/auxiliary.db-wal"
+printf 'live shm must not be copied\n' > "$PB_FAKE/auxiliary.db-shm"
 printf 'fake image bytes\n' > "$PB_FAKE/storage/images/example.txt"
 
 output=$(PB_DATA_DIR="$PB_FAKE" BACKUP_DIR="$BACKUPS" bash "$SCRIPT")
 printf '%s\n' "$output"
 grep -q 'sqlite-online-backup=data.db' <<< "$output"
+grep -q 'sqlite-online-backup=auxiliary.db' <<< "$output"
 
 archive=$(find "$BACKUPS" -maxdepth 1 -type f -name 'pocketbase-*.tar.gz' | sort | tail -1)
 [ -n "$archive" ] || { echo 'expected archive file' >&2; exit 1; }
 [ -s "$archive" ] || { echo 'archive is empty' >&2; exit 1; }
 [ -f "$archive.sha256" ] || { echo 'expected checksum file' >&2; exit 1; }
+
+file_mode() {
+  if stat -f '%Lp' "$1" >/dev/null 2>&1; then
+    stat -f '%Lp' "$1"
+  else
+    stat -c '%a' "$1"
+  fi
+}
+[ "$(file_mode "$archive")" = '600' ] || { echo 'expected archive mode 600' >&2; exit 1; }
+[ "$(file_mode "$archive.sha256")" = '600' ] || { echo 'expected checksum mode 600' >&2; exit 1; }
 
 recorded_archive=$(cut -d ' ' -f 3- "$archive.sha256")
 [ "$recorded_archive" = "$(basename "$archive")" ] || {
@@ -37,7 +51,12 @@ else
 fi
 
 tar -tzf "$archive" | grep -q '^pb_data/data.db$'
+tar -tzf "$archive" | grep -q '^pb_data/auxiliary.db$'
 tar -tzf "$archive" | grep -q '^pb_data/storage/images/example.txt$'
+if tar -tzf "$archive" | grep -Eq '^pb_data/.*\.db-(wal|shm)$'; then
+  echo 'expected live SQLite WAL/SHM sidecars to be excluded after online backup' >&2
+  exit 1
+fi
 
 RESTORE_DIR="$TMP_DIR/restore"
 mkdir -p "$RESTORE_DIR"
@@ -48,7 +67,60 @@ restored_integrity=$(sqlite3 "$RESTORE_DIR/pb_data/data.db" 'PRAGMA integrity_ch
 [ "$restored_integrity" = 'ok' ] || { echo "expected restored SQLite integrity ok, got: $restored_integrity" >&2; exit 1; }
 restored_value=$(sqlite3 "$RESTORE_DIR/pb_data/data.db" "SELECT value FROM smoke WHERE id = 1;")
 [ "$restored_value" = 'fake sqlite row' ] || { echo "expected restored sqlite row, got: $restored_value" >&2; exit 1; }
+restored_aux_integrity=$(sqlite3 "$RESTORE_DIR/pb_data/auxiliary.db" 'PRAGMA integrity_check;')
+[ "$restored_aux_integrity" = 'ok' ] || { echo "expected restored auxiliary SQLite integrity ok, got: $restored_aux_integrity" >&2; exit 1; }
+restored_aux_value=$(sqlite3 "$RESTORE_DIR/pb_data/auxiliary.db" "SELECT value FROM analytics WHERE id = 1;")
+[ "$restored_aux_value" = 'fake auxiliary row' ] || { echo "expected restored auxiliary row, got: $restored_aux_value" >&2; exit 1; }
 cmp "$PB_FAKE/storage/images/example.txt" "$RESTORE_DIR/pb_data/storage/images/example.txt"
+
+# Keep a real WAL-mode writer open while the helper runs. The staged database
+# must retain the committed row while the archive remains sidecar-free.
+WAL_SOURCE="$TMP_DIR/wal-case/pb_data"
+WAL_BACKUPS="$TMP_DIR/wal-backups"
+mkdir -p "$WAL_SOURCE" "$WAL_BACKUPS"
+python3 - "$SCRIPT" "$WAL_SOURCE" "$WAL_BACKUPS" <<'PY'
+import io
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+script, source_dir, backup_dir = sys.argv[1:]
+database = Path(source_dir) / "data.db"
+connection = sqlite3.connect(database)
+try:
+    assert connection.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower() == "wal"
+    connection.execute("PRAGMA wal_autocheckpoint=0")
+    connection.execute("CREATE TABLE wal_smoke (value TEXT NOT NULL)")
+    connection.execute("INSERT INTO wal_smoke VALUES ('committed in wal')")
+    connection.commit()
+    assert Path(str(database) + "-wal").exists()
+
+    env = os.environ.copy()
+    env.update(PB_DATA_DIR=source_dir, BACKUP_DIR=backup_dir)
+    subprocess.run(["bash", script], env=env, check=True, capture_output=True, text=True)
+
+    archive = sorted(Path(backup_dir).glob("pocketbase-*.tar.gz"))[-1]
+    with tarfile.open(archive, "r:gz") as tar:
+        names = tar.getnames()
+        assert not any(name.endswith((".db-wal", ".db-shm")) for name in names), names
+        member = tar.getmember("pb_data/data.db")
+        restored_bytes = tar.extractfile(member).read()
+    with tempfile.NamedTemporaryFile(suffix=".db") as restored:
+        restored.write(restored_bytes)
+        restored.flush()
+        check = sqlite3.connect(restored.name)
+        try:
+            assert check.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+            assert check.execute("SELECT value FROM wal_smoke").fetchone() == ("committed in wal",)
+        finally:
+            check.close()
+finally:
+    connection.close()
+PY
 
 if find "$BACKUPS" -maxdepth 1 \( -type f -o -type d \) -name '*.tmp.*' | grep -q .; then
   echo 'expected no temporary archive/checksum/staging files after successful backup' >&2
